@@ -143,6 +143,40 @@ func (s *wcaSession) SetVolume(v float32) error {
 	return nil
 }
 
+func (s *wcaSession) GetMute() bool {
+	var muted bool
+
+	if err := s.volume.GetMute(&muted); err != nil {
+		s.logger.Warnw("Failed to get session mute", "error", err)
+	}
+
+	return muted
+}
+
+func (s *wcaSession) SetMute(v bool) error {
+	if err := s.volume.SetMute(v, s.eventCtx); err != nil {
+		s.logger.Warnw("Failed to set session mute", "error", err)
+		return fmt.Errorf("adjust session mute: %w", err)
+	}
+
+	// mitigate expired sessions by checking the state whenever we change volumes
+	var state uint32
+
+	if err := s.control.GetState(&state); err != nil {
+		s.logger.Warnw("Failed to get session state while setting mute", "error", err)
+		return fmt.Errorf("get session state: %w", err)
+	}
+
+	if state == wca.AudioSessionStateExpired {
+		s.logger.Warnw("Audio session expired, triggering session refresh")
+		return errRefreshSessions
+	}
+
+	s.logger.Debugw("Adjusting session mute", "to", fmt.Sprintf("%t", v))
+
+	return nil
+}
+
 func (s *wcaSession) Release() {
 	s.logger.Debug("Releasing audio session")
 
@@ -179,6 +213,35 @@ func (s *masterSession) SetVolume(v float32) error {
 	}
 
 	s.logger.Debugw("Adjusting session volume", "to", fmt.Sprintf("%.2f", v))
+
+	return nil
+}
+
+func (s *masterSession) GetMute() bool {
+	var muted bool
+
+	if err := s.volume.GetMute(&muted); err != nil {
+		s.logger.Warnw("Failed to get session mute", "error", err)
+	}
+
+	return muted
+}
+
+func (s *masterSession) SetMute(v bool) error {
+	if s.stale {
+		s.logger.Warnw("Session expired because default device has changed, triggering session refresh")
+		return errRefreshSessions
+	}
+
+	if err := s.volume.SetMute(v, s.eventCtx); err != nil {
+		s.logger.Warnw("Failed to set session mute",
+			"error", err,
+			"mute", v)
+
+		return fmt.Errorf("adjust session mute: %w", err)
+	}
+
+	s.logger.Debugw("Adjusting session mute", "to", fmt.Sprintf("%t", v))
 
 	return nil
 }

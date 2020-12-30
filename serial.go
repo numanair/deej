@@ -30,7 +30,6 @@ type SerialIO struct {
 	conn        io.ReadWriteCloser
 
 	lastKnownNumSliders        int
-	currentSliderPercentValues []float32
 
 	sliderMoveConsumers []chan SliderMoveEvent
 }
@@ -39,9 +38,10 @@ type SerialIO struct {
 type SliderMoveEvent struct {
 	SliderID     int
 	PercentValue float32
+	Mute         bool
 }
 
-var expectedLinePattern = regexp.MustCompile(`^\d{1,4}(\|\d{1,4})*\r\n$`)
+var expectedLinePattern = regexp.MustCompile(`^(-?\d{1,4}|x)((\|-?\d{1,4}|x))*\r\n$`)
 
 // NewSerialIO creates a SerialIO instance that uses the provided deej
 // instance's connection info to establish communications with the arduino chip
@@ -240,59 +240,50 @@ func (sio *SerialIO) handleLine(logger *zap.SugaredLogger, line string) {
 
 	// split on pipe (|), this gives a slice of numerical strings between "0" and "1023"
 	splitLine := strings.Split(line, "|")
-	numSliders := len(splitLine)
-
-	// update our slider count, if needed - this will send slider move events for all
-	if numSliders != sio.lastKnownNumSliders {
-		logger.Infow("Detected sliders", "amount", numSliders)
-		sio.lastKnownNumSliders = numSliders
-		sio.currentSliderPercentValues = make([]float32, numSliders)
-
-		// reset everything to be an impossible value to force the slider move event later
-		for idx := range sio.currentSliderPercentValues {
-			sio.currentSliderPercentValues[idx] = -1.0
-		}
-	}
 
 	// for each slider:
 	moveEvents := []SliderMoveEvent{}
 	for sliderIdx, stringValue := range splitLine {
+		// check for muted channel
+		if stringValue == "x" {
+
+			moveEvents = append(moveEvents, SliderMoveEvent{
+				SliderID:     sliderIdx,
+				PercentValue: 0,
+				Mute: true,
+			})
+
+			if sio.deej.Verbose() {
+				logger.Debugw("Slider muted", "event", moveEvents[len(moveEvents)-1])
+			}
+
+			continue
+		}
 
 		// convert string values to integers ("1023" -> 1023)
 		number, _ := strconv.Atoi(stringValue)
 
-		// turns out the first line could come out dirty sometimes (i.e. "4558|925|41|643|220")
-		// so let's check the first number for correctness just in case
-		if sliderIdx == 0 && number > 1023 {
-			sio.logger.Debugw("Got malformed line from serial, ignoring", "line", line)
-			return
-		}
-
-		// map the value from raw to a "dirty" float between 0 and 1 (e.g. 0.15451...)
-		dirtyFloat := float32(number) / 1023.0
-
-		// normalize it to an actual volume scalar between 0.0 and 1.0 with 2 points of precision
-		normalizedScalar := util.NormalizeScalar(dirtyFloat)
-
 		// if sliders are inverted, take the complement of 1.0
 		if sio.deej.config.InvertSliders {
-			normalizedScalar = 1 - normalizedScalar
+			number = -1 * number
 		}
 
-		// check if it changes the desired state (could just be a jumpy raw slider value)
-		if util.SignificantlyDifferent(sio.currentSliderPercentValues[sliderIdx], normalizedScalar, sio.deej.config.NoiseReductionLevel) {
+		percentageOffset := number * sio.deej.config.PercentModifier
 
-			// if it does, update the saved value and create a move event
-			sio.currentSliderPercentValues[sliderIdx] = normalizedScalar
+		newSliderValue := float32(percentageOffset) / 100.0
 
-			moveEvents = append(moveEvents, SliderMoveEvent{
-				SliderID:     sliderIdx,
-				PercentValue: normalizedScalar,
-			})
+		logger.Debugw("Slider moved", "number", number)
+		logger.Debugw("Slider moved", "percentageOffset", percentageOffset)
+		logger.Debugw("Slider moved", "newSliderValue", newSliderValue)
 
-			if sio.deej.Verbose() {
-				logger.Debugw("Slider moved", "event", moveEvents[len(moveEvents)-1])
-			}
+		moveEvents = append(moveEvents, SliderMoveEvent{
+			SliderID:     sliderIdx,
+			PercentValue: newSliderValue,
+			Mute: false,
+		})
+
+		if sio.deej.Verbose() {
+			logger.Debugw("Slider moved", "event", moveEvents[len(moveEvents)-1])
 		}
 	}
 
