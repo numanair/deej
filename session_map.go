@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"math"
 
 	"github.com/omriharel/deej/util"
 	"github.com/thoas/go-funk"
@@ -247,10 +248,20 @@ func (m *sessionMap) handleSliderMoveEvent(event SliderMoveEvent) {
 
 			// iterate all matching sessions and adjust the volume of each one
 			for _, session := range sessions {
-				if session.GetVolume() != event.PercentValue {
-					if err := session.SetVolume(event.PercentValue); err != nil {
-						m.logger.Warnw("Failed to set target session volume", "error", err)
-						adjustmentFailed = true
+				if event.Mute {
+					if !session.GetMute() {
+						session.SetMute(true)
+					}
+				} else {
+					if session.GetMute() {
+						session.SetMute(false)
+					}
+					newVolume := float32(math.Min(1, math.Max(0, float64(session.GetVolume() + event.PercentValue))))
+					if newVolume != session.GetVolume() {
+						if err := session.SetVolume(newVolume); err != nil {
+							m.logger.Warnw("Failed to set target session volume", "error", err)
+							adjustmentFailed = true
+						}
 					}
 				}
 			}

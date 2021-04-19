@@ -25,7 +25,7 @@ type CanonicalConfig struct {
 
 	InvertSliders bool
 
-	NoiseReductionLevel string
+	PercentModifier int
 
 	logger             *zap.SugaredLogger
 	notifier           Notifier
@@ -52,7 +52,7 @@ const (
 	configKeyInvertSliders       = "invert_sliders"
 	configKeyCOMPort             = "com_port"
 	configKeyBaudRate            = "baud_rate"
-	configKeyNoiseReductionLevel = "noise_reduction"
+	configKeyPercentModifier = "percent_modifier"
 
 	defaultCOMPort  = "COM4"
 	defaultBaudRate = 9600
@@ -237,7 +237,7 @@ func (cc *CanonicalConfig) populateFromVipers() error {
 	}
 
 	cc.InvertSliders = cc.userConfig.GetBool(configKeyInvertSliders)
-	cc.NoiseReductionLevel = cc.userConfig.GetString(configKeyNoiseReductionLevel)
+	cc.PercentModifier = cc.userConfig.GetInt(configKeyPercentModifier)
 
 	cc.logger.Debug("Populated config fields from vipers")
 
