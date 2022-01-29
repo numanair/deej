@@ -13,7 +13,7 @@ const int ADC_bits = 12; // 10 or 12-bit
 //float output[] = {0, 85.25, 170.5, 255.75, 341, 426.25, 511.5, 596.75, 682, 767.25, 852.5, 1023};
 
 // Adjusted multiMap for compromise on precision and linearity
-float input[] =  {0, 32,    145,   353,    909,  4064};
+float input[] =  {2, 32,    145,   353,    909,  4064};
 float output[] = {0, 85.25, 170.5, 255.75, 341,  1023};
 
 int analogSliderValues[NUM_SLIDERS];
