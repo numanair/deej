@@ -1,0 +1,1 @@
+# Uses old Roger Clark core with USBcomposite lib
