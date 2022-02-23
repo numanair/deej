@@ -1,9 +1,7 @@
 #include <Arduino.h>
-//#include <Arduino_Helpers.h>
-//#include <AH/Timing/MillisMicrosTimer.hpp>
 #include <USBComposite.h>
 #include "MultiMap.h"
-#include <BlockNot.h>   
+#include <BlockNot.h>
 
 // Number of potentiometers or faders
 const int NUM_SLIDERS = 5;
@@ -21,28 +19,30 @@ float measuredInput[] = {0, 4095};
 // const uint8 pot_pin = 6;
 const uint8 threshold = 1;
 
-const unsigned int midi_channel =
-    1; // this might show up as channel 1 depending on start index
-const unsigned int cc_command = 0; // bank select command
+const unsigned int midi_channel[NUM_SLIDERS] = {1, 2, 3, 4, 5};
+const unsigned int cc_command[NUM_SLIDERS] = {7, 7, 7, 7, 7}; // MIDI CC number
 
 // number of elements in the MultiMap arrays
 const int arrayQty = sizeof(measuredInput) / sizeof(measuredInput[0]);
 float adjustedinputval[arrayQty] = {0};
 
-// milliseconds between sending serial data
-BlockNot timer(10);
+BlockNot timer(10); // milliseconds between sending serial data
 
 // Probably no need to change these calculated values
 float idealOutputValues[arrayQty] = {0, 4095};
 // Note: 16383 = 2¹⁴ - 1 (the maximum value that can be represented by
 // a 14-bit unsigned number
 
-unsigned int old_value = 0;
-unsigned int new_value = 0;
+unsigned int old_value[NUM_SLIDERS] = {0};
+unsigned int new_value[NUM_SLIDERS] = {0};
 unsigned int analogSliderValues[NUM_SLIDERS];
 
 USBMIDI midi;
 USBCompositeSerial CompositeSerial;
+
+void sendSliderValues();
+void updateSliderValues();
+void filteredAnalog();
 
 void setup() {
   USBComposite.clear(); // clear any plugins previously registered
@@ -54,19 +54,34 @@ void setup() {
   midi.begin();
   CompositeSerial.begin(38400);
 
-  while(!CompositeSerial.isConnected()); // spin waiting for usb serial to come active
+  while(!CompositeSerial.isConnected()); // wait for usb serial
   delay(500);
 }
 
 void loop() {
-  
-
-  // Deej loop
-  if (timer.HAS_TRIGGERED)
-  {
+  // Deej loop and MIDI values and sending
+  if (timer.HAS_TRIGGERED){
     updateSliderValues();
     sendSliderValues();
+    filteredAnalog();
+    timer.RESET;
   }
+}
+
+void filteredAnalog() {
+  unsigned int val[NUM_SLIDERS] = {};
+  for (int i = 0; i < NUM_SLIDERS; i++) {
+    val[i] = {analogRead(analogInputs[i])};
+    // If difference between new_value and old_value is greater than threshold, send new values
+    if ((new_value[i] > old_value[i] && new_value[i] - old_value[i] > threshold) ||
+    (new_value[i] < old_value[i] && old_value[i] - new_value[i] > threshold)) {
+      // Send MIDI
+      midi.sendControlChange(midi_channel[i], cc_command[i], new_value[i]);
+      // Update old_value
+      old_value[i] = new_value[i];
+    }
+  }
+}
 
 //   int temp = analogRead(pot_pin); // a value between 0-4095
 //   new_value = temp / 32;          // convert to a value between 0-127
@@ -85,12 +100,11 @@ void loop() {
   
 //   // Wait 50ms before reading the pin again
 //   delay(50);
-}
+
 
 void updateSliderValues() {
   for (int i = 0; i < NUM_SLIDERS; i++) {
-    analogSliderValues[i] = round((multiMap<float>(analogRead(analogInputs[i]) * 4, adjustedinputval, idealOutputValues, arrayQty))) / 16;
-    //analogSliderValues[i] = analogRead(analogInputs[i]); //unfiltered output
+    analogSliderValues[i] = multiMap<float>(analogRead(analogInputs[i]), adjustedinputval, idealOutputValues, arrayQty) / 4;
   }
 }
 
@@ -98,9 +112,7 @@ void updateSliderValues() {
 void sendSliderValues() {
   String builtString = String("");
   for (int i = 0; i < NUM_SLIDERS; i++) {
-    builtString += String((int)round(analogSliderValues[i])); // raw (Deej software does the filtering)
-    // builtString += String((int)round(volumePotentiometers[i].getRawValue() / 16)); // raw (Deej software does the filtering)
-    //builtString += String((int)volumePotentiometers[i].getValue()); // filtered
+    builtString += String((int)round(analogSliderValues[i]));
     if (i < NUM_SLIDERS - 1) {
       builtString += String("|");
     }
