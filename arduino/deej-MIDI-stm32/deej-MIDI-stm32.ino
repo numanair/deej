@@ -3,6 +3,9 @@
 #include "MultiMap.h"
 #include <BlockNot.h>
 
+const uint8 midi_channel[NUM_SLIDERS] = {0, 1, 2, 3, 4}; // Starts at 0?
+const uint8 cc_command[NUM_SLIDERS] = {7, 7, 7, 7, 7}; // MIDI CC number
+
 // Number of potentiometers or faders
 const uint8 NUM_SLIDERS = 5;
 
@@ -16,9 +19,6 @@ const uint8 threshold = 1;
 
 // measured output every equal 5mm increment in 12-bit. Minimum and maximum values are not affected by correctionMultiplier.
 const float measuredInput[] = {14, 50, 165,  413, 907, 1450, 1975, 2545, 3095, 3645, 3923, 4030, 4088};
-
-const uint8 midi_channel[NUM_SLIDERS] = {1, 2, 3, 4, 5};
-const uint8 cc_command[NUM_SLIDERS] = {7, 7, 7, 7, 7}; // MIDI CC number
 
 // Calculate number of elements in the MultiMap arrays
 const int arrayQty = sizeof(measuredInput) / sizeof(measuredInput[0]);
@@ -94,10 +94,8 @@ void loop() {
 }
 
 void filteredAnalog() {
-  int val[NUM_SLIDERS] = {};
   for (int i = 0; i < NUM_SLIDERS; i++) {
-    val[i] = {analogSliderValues[i]};
-    new_value[i] = val[i] / 32;
+    new_value[i] = analogSliderValues[i] / 32; // convert from 12-bit to 7-bit for MIDI
     // If difference between new_value and old_value is greater than threshold, send new values
     if ((new_value[i] > old_value[i] && new_value[i] - old_value[i] > threshold) ||
     (new_value[i] < old_value[i] && old_value[i] - new_value[i] > threshold)) {
