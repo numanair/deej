@@ -3,11 +3,11 @@
 #include "MultiMap.h"
 #include <BlockNot.h>
 
-const uint8 midi_channel[NUM_SLIDERS] = {0, 1, 2, 3, 4}; // Starts at 0?
-const uint8 cc_command[NUM_SLIDERS] = {7, 7, 7, 7, 7}; // MIDI CC number
-
 // Number of potentiometers or faders
 const uint8 NUM_SLIDERS = 5;
+
+const uint8 midi_channel[NUM_SLIDERS] = {0, 1, 2, 3, 4}; // Starts at 0?
+const uint8 cc_command[NUM_SLIDERS] = {7, 7, 7, 7, 7}; // MIDI CC number
 
 // Potentiometer pins assignment
 const uint8 analogInputs[NUM_SLIDERS] = {0, 1, 2, 3, 4};
@@ -59,7 +59,7 @@ void setup() {
   USBComposite.setVendorId(0x0483); // STMicroelectronics
   USBComposite.setProductId(0xf7cc);
   USBComposite.setManufacturerString("STMicroelectronics");
-  USBComposite.setProductString("STM32MIDI-MIX5R");
+  USBComposite.setProductString("MIDI-MIX5R");
 
 //  USBComposite.setVendorId(uint16 vendor);
 //  USBComposite.setProductId(uint16 product);
@@ -86,10 +86,10 @@ void setup() {
 void loop() {
   // Deej loop and MIDI values and sending
   if (timer.HAS_TRIGGERED){
-    updateSliderValues();
-    filteredAnalog();
-    sendSliderValues();
-    timer.RESET;
+    timer.RESET; // BlockNot non-blocking timer
+    updateSliderValues(); // Gets new slider values
+    filteredAnalog(); // MIDI
+    sendSliderValues(); // Deej Serial
   }
 }
 
