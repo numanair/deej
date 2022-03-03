@@ -4,6 +4,14 @@
 #include <neotimer.h>
 #include "EEPROM.h"
 
+// This sketch uses serial input in the following format:
+// <CC,CC,CC,CC,CC:CH,CH,CH,CH,CH>
+// For example: <07,07,07,07,07:01,02,03,04,05>
+// This sets all faders to MIDI CC 7 (volume control) and assigns each to channel 1-5
+// Channel can be 1-16
+// https://www.midi.org/specifications-old/item/table-3-control-change-messages-data-bytes-2
+// https://anotherproducer.com/online-tools-for-musicians/midi-cc-list/
+
 // Number of potentiometers or faders
 const uint8 NUM_SLIDERS = 5;
 
@@ -13,13 +21,12 @@ uint8 cc_command[NUM_SLIDERS] = {7, 7, 7, 7, 7}; // MIDI CC number
 const byte MAX_RECEIVE_LENGTH = (NUM_SLIDERS * 3 - 1) * 2 + 1 + 6;
 char receivedChars[MAX_RECEIVE_LENGTH];
 char tempChars[MAX_RECEIVE_LENGTH]; // temporary array for use when parsing
-char CC_CH[MAX_RECEIVE_LENGTH];
 
 // variables to hold the parsed data
 char messageFromPC[MAX_RECEIVE_LENGTH] = {0};
 int integerFromPC = 0;
-char stringCC[MAX_RECEIVE_LENGTH] = {0};
-char stringCHAN[MAX_RECEIVE_LENGTH] = {0};
+char stringCC[MAX_RECEIVE_LENGTH / 2] = {0};
+char stringCHAN[MAX_RECEIVE_LENGTH / 2] = {0};
 
 
 bool newData = false;
@@ -82,7 +89,6 @@ void setup() {
   USBComposite.begin();
   //  USBComposite.setProductId(0x0031);
   //  USBComposite.setProductId(0x0483);
-  //  USBComposite.setProductString("MIX5R");
 
   USBComposite.setVendorId(0x0483); // STMicroelectronics
   USBComposite.setProductId(0xf7cc);
@@ -121,7 +127,7 @@ void loop() {
     }
     if (mytimer2.done()) {
       if (prog_end) {
-        CompositeSerial.println("PROGRAMMING END");
+        CompositeSerial.println("PROG END");
         CompositeSerial.println("RESUMING DEEJ");
       }
       prog_end = 0;
@@ -132,7 +138,7 @@ void loop() {
   if (newData == true) {
     strcpy(tempChars, receivedChars);
     // this temporary copy is necessary to protect the original data
-    //   because strtok() used in parseData() replaces the commas with \0
+    // because strtok() used in parseData() replaces the commas with \0
     parseData();
     CompositeSerial.println("New MIDI settings:");
     printMIDI_CC();
@@ -173,63 +179,14 @@ void recvWithStartEndMarkers() {
   }
 }
 
-/*
-  void recvWithStartEndMarkers(){
-  if (CompositeSerial.available() > 0) {
-    static unsigned int message_pos = 0;
-    char inByte = CompositeSerial.read();
-    //Message coming in (check not terminating character)
-    if ( inByte != '\n' && (message_pos < MAX_MESSAGE_LENGTH - 1) ) {
-      deej = 0;
-      message_in[message_pos] = inByte;
-      message_pos++;
-    }
-    //Full message received...
-    else {
-      //Add null character to string
-      message_in[message_pos] = '\0';
-
-      //Echo message_in
-      CompositeSerial.println("PROGRAMMING START");
-      CompositeSerial.println(message_in);
-
-      //Send message to variable WIP
-      // 1  2  3  4  5 : 1  2  3  4  5
-      // CC,CC,CC,CC,CC:CH,CH,CH,CH,CH
-      // 07,14,14,14,14:01,01,01,01,01
-      // <07,14,14,14,14>:01,01,01,01,01
-
-      char * strtokIndx; // this is used by strtok() as an index
-
-  //      char tempData[MAX_MESSAGE_LENGTH];
-  //      strcpy(tempData, message_in);
-
-      int count = 0;
-      while ( strtokIndx != NULL ) {
-        strtokIndx = strtok(message_in, ",");
-        CompositeSerial.print(atoi(strtokIndx));
-
-  //        cc_command[count] = atoi(strtokIndx);
-  //        CompositeSerial.println(cc_command[count]);
-        count++;
-      }
-
-      //Reset for the next message
-      message_pos = 0;
-      prog_end = 1;
-      mytimer2.reset();
-      mytimer2.start();
-    }
-  }
-  }
-*/
+// <CC,CC,CC,CC,CC:CH,CH,CH,CH,CH>
+// <07,14,14,14,14>:01,01,01,01,01
 
 void parseData() {
   // split the data into its parts and recombine
 
   char * strtokIndx1; // CC... / CH...
-  char * strtokIndx2; // CC's
-  char * strtokIndx3; // CH's
+  char * strtokIndx2; // Somehow two pointers is less flash used than a single one
 
   strtokIndx1 = strtok(tempChars, ":");
   strcpy(stringCC, strtokIndx1);
@@ -242,7 +199,7 @@ void parseData() {
     if (i == 0) {
       strtokIndx2 = strtok(stringCC, ",");
     }
-    else if (strtokIndx2 != NULL) {
+    else if (strtokIndx1 != NULL) {
       strtokIndx2 = strtok(NULL, ",");
     }
     integerFromPC = atoi(strtokIndx2); // convert this part to an integer
@@ -251,6 +208,7 @@ void parseData() {
   // End CC code
 
   stringCHAN[NUM_SLIDERS * 3] = '\0'; // NULL terminate
+  
   // Start Channel code
   for (int i = 0; i < NUM_SLIDERS; i++) {
     if (i == 0) {
