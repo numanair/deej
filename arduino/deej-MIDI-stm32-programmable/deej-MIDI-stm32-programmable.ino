@@ -15,6 +15,9 @@
 // Number of potentiometers or faders
 const uint8 NUM_SLIDERS = 5;
 
+// Potentiometer pins assignment
+const uint8 analogInputs[NUM_SLIDERS] = {0, 1, 2, 3, 4};
+
 uint8 midi_channel[NUM_SLIDERS] = {0, 1, 2, 3, 4}; // Starts at 0?
 uint8 cc_command[NUM_SLIDERS] = {7, 7, 7, 7, 7}; // MIDI CC number
 
@@ -28,12 +31,7 @@ int integerFromPC = 0;
 char stringCC[MAX_RECEIVE_LENGTH / 2] = {0};
 char stringCHAN[MAX_RECEIVE_LENGTH / 2] = {0};
 
-
 bool newData = false;
-
-
-// Potentiometer pins assignment
-const uint8 analogInputs[NUM_SLIDERS] = {0, 1, 2, 3, 4};
 
 // Adjusts linearity correction for my specific potentiometers.
 // 1 = fully linear but jittery. 0.7 is about max for no jitter.
