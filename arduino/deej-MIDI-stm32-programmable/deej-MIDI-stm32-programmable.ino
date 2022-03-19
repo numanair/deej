@@ -121,14 +121,14 @@ void loop() {
     updateSliderValues(); // Gets new slider values
     filteredAnalog(); // MIDI
     if (deej) {
-      //      sendSliderValues(); // Deej Serial
+      sendSliderValues(); // Deej Serial
     }
-    if (mytimer2.done()) {
+    else if (mytimer2.done()) {
       if (prog_end) {
         CompositeSerial.println("PROG END");
         CompositeSerial.println("RESUMING DEEJ");
+        prog_end = 0;
       }
-      prog_end = 0;
       deej = 1;
     }
   }
@@ -138,7 +138,11 @@ void loop() {
     // this temporary copy is necessary to protect the original data
     // because strtok() used in parseData() replaces the commas with \0
     parseData();
+    deej = 0;
     CompositeSerial.println("New MIDI settings:");
+    mytimer2.reset();
+    mytimer2.start();
+    prog_end = 1;
     printMIDI_CC();
     printMIDI_CHAN();
     newData = false;
@@ -206,7 +210,7 @@ void parseData() {
   // End CC code
 
   stringCHAN[NUM_SLIDERS * 3] = '\0'; // NULL terminate
-  
+
   // Start Channel code
   for (int i = 0; i < NUM_SLIDERS; i++) {
     if (i == 0) {
