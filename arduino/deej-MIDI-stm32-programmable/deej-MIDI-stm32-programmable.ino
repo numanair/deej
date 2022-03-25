@@ -239,7 +239,7 @@ void printMIDI_CC() {
 void printMIDI_CHAN() {
   CompositeSerial.println("printMIDI_CHAN:");
   for (int i = 0; i < NUM_SLIDERS; i++) {
-    CompositeSerial.print(midi_channel[i]);
+    CompositeSerial.print(midi_channel[i] + 1); //channel starts at 0.
     if (i < NUM_SLIDERS - 1) {
       CompositeSerial.print(", ");
     }
