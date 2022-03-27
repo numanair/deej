@@ -2,7 +2,7 @@
 #include <USBComposite.h>
 #include "MultiMap.h"
 #include <neotimer.h>
-#include "EEPROM.h"
+//#include "EEPROM.h"
 
 // This sketch uses serial input in the following format:
 // <CC,CC,CC,CC,CC:CH,CH,CH,CH,CH>
@@ -36,7 +36,7 @@ bool newData = false;
 // Adjusts linearity correction for my specific potentiometers.
 // 1 = fully linear but jittery. 0.7 is about max for no jitter.
 const float correctionMultiplier = 0.65;
-const uint8 threshold = 1;
+const uint8 threshold = 40; // 32ish
 
 // measured output every equal 5mm increment in 12-bit. Minimum and maximum values are not affected by correctionMultiplier.
 const float measuredInput[] = {14, 50, 165,  413, 907, 1450, 1975, 2545, 3095, 3645, 3923, 4030, 4088};
@@ -53,14 +53,14 @@ float idealOutputValues[arrayQty] = {0, 341, 682, 1024, 1365, 1706, 2048, 2389, 
 //const uint8 MAX_RECEIVE_LENGTH = NUM_SLIDERS * 3 - 1;
 // static char incoming_message[MAX_RECEIVE_LENGTH];
 
-uint8 old_value[NUM_SLIDERS] = {0};
-uint8 new_value[NUM_SLIDERS] = {0};
+int old_value[NUM_SLIDERS] = {0};
+int new_value[NUM_SLIDERS] = {0};
 float analogSliderValues[NUM_SLIDERS];
 const int MAX_MESSAGE_LENGTH = NUM_SLIDERS * 6; // sliders * 00:00,
 bool prog_end = 0;
 bool deej = 1;
 
-Neotimer mytimer = Neotimer(50); // ms
+Neotimer mytimer = Neotimer(10); // ms
 Neotimer mytimer2 = Neotimer(15000); // ms
 USBMIDI midi;
 USBCompositeSerial CompositeSerial;
@@ -249,12 +249,19 @@ void printMIDI_CHAN() {
 
 void filteredAnalog() {
   for (int i = 0; i < NUM_SLIDERS; i++) {
-    new_value[i] = analogSliderValues[i] / 32; // convert from 12-bit to 7-bit for MIDI
+    new_value[i] = analogSliderValues[i]; // 12-bit
     // If difference between new_value and old_value is greater than threshold, send new values
     if ((new_value[i] > old_value[i] && new_value[i] - old_value[i] > threshold) ||
         (new_value[i] < old_value[i] && old_value[i] - new_value[i] > threshold)) {
       // Send MIDI
-      midi.sendControlChange(midi_channel[i] - 1, cc_command[i], new_value[i]); // channel starts at 0, but midi_channel starts at 1
+      // convert from 12-bit to 7-bit for MIDI
+      // channel starts at 0, but midi_channel starts at 1
+      int mappedVal = map(new_value[i], 0, 4095 - (32 - 2), 0, 127);
+      if (mappedVal > 127) {
+        mappedVal = 127;
+      }
+      //      CompositeSerial.println(mappedVal);
+      midi.sendControlChange(midi_channel[i] - 1, cc_command[i], mappedVal);
       // Update old_value
       old_value[i] = new_value[i];
     }
@@ -271,7 +278,11 @@ void updateSliderValues() {
 void sendSliderValues() {
   String builtString = String("");
   for (int i = 0; i < NUM_SLIDERS; i++) {
-    builtString += String((int)round(analogSliderValues[i] / 4));
+    int limitedVal = analogSliderValues[i] / 4;
+    if (limitedVal > 1023) {
+      limitedVal = 1023;
+    }
+    builtString += String((int)limitedVal);
     if (i < NUM_SLIDERS - 1) {
       builtString += String("|");
     }
