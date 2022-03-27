@@ -18,8 +18,8 @@ const uint8 NUM_SLIDERS = 5;
 // Potentiometer pins assignment
 const uint8 analogInputs[NUM_SLIDERS] = {0, 1, 2, 3, 4};
 
-uint8 midi_channel[NUM_SLIDERS] = {0, 1, 2, 3, 4}; // Starts at 0?
-uint8 cc_command[NUM_SLIDERS] = {7, 7, 7, 7, 7}; // MIDI CC number
+uint8 midi_channel[NUM_SLIDERS] = {1, 1, 1, 1, 1}; // 1 through 16
+uint8 cc_command[NUM_SLIDERS] = {7, 19, 21, 11, 1}; // MIDI CC number
 
 const byte MAX_RECEIVE_LENGTH = (NUM_SLIDERS * 3 - 1) * 2 + 1 + 6;
 char receivedChars[MAX_RECEIVE_LENGTH];
@@ -35,7 +35,7 @@ bool newData = false;
 
 // Adjusts linearity correction for my specific potentiometers.
 // 1 = fully linear but jittery. 0.7 is about max for no jitter.
-const float correctionMultiplier = 0.70;
+const float correctionMultiplier = 0.65;
 const uint8 threshold = 1;
 
 // measured output every equal 5mm increment in 12-bit. Minimum and maximum values are not affected by correctionMultiplier.
@@ -220,7 +220,7 @@ void parseData() {
       strtokIndx2 = strtok(NULL, ",");
     }
     integerFromPC = atoi(strtokIndx2); // convert this part to an integer
-    midi_channel[i] = integerFromPC - 1;
+    midi_channel[i] = integerFromPC;
   }
   // End Channel code
 }
@@ -239,7 +239,7 @@ void printMIDI_CC() {
 void printMIDI_CHAN() {
   CompositeSerial.println("printMIDI_CHAN:");
   for (int i = 0; i < NUM_SLIDERS; i++) {
-    CompositeSerial.print(midi_channel[i] + 1); //channel starts at 0.
+    CompositeSerial.print(midi_channel[i]);
     if (i < NUM_SLIDERS - 1) {
       CompositeSerial.print(", ");
     }
@@ -254,7 +254,7 @@ void filteredAnalog() {
     if ((new_value[i] > old_value[i] && new_value[i] - old_value[i] > threshold) ||
         (new_value[i] < old_value[i] && old_value[i] - new_value[i] > threshold)) {
       // Send MIDI
-      midi.sendControlChange(midi_channel[i], cc_command[i], new_value[i]);
+      midi.sendControlChange(midi_channel[i] - 1, cc_command[i], new_value[i]); // channel starts at 0, but midi_channel starts at 1
       // Update old_value
       old_value[i] = new_value[i];
     }
