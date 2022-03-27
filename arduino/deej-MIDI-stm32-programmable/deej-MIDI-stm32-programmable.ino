@@ -61,7 +61,7 @@ bool prog_end = 0;
 bool deej = 1;
 
 Neotimer mytimer = Neotimer(50); // ms
-Neotimer mytimer2 = Neotimer(4000); // ms
+Neotimer mytimer2 = Neotimer(15000); // ms
 USBMIDI midi;
 USBCompositeSerial CompositeSerial;
 
