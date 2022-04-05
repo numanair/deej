@@ -10,19 +10,19 @@ Support for permanently saving settings is not yet implemented, so unplugging or
 
 ## Fader Assignment Steps
 
-![CoolTerm serial demo](Images\Animation_trimmed_ff.gif)
+![CoolTerm serial demo](https://github.com/numanair/deej/blob/stm32-logic/Docs/Images/Animation_trimmed_ff.gif)
 
 ### 1. Setup Serial Tools
 
 Fader assignment is done through serial instead of MIDI. Any serial terminal can be used, but for this tutorial we will use CoolTerm. The free download is available here: <https://www.freeware.the-meiers.org/> *NOTE:* The regular downloads are on the left. Don't mistakenly download an older or different version from the middle section.
 
-![CoolTerm Download](Images\CoolTerm-dl.png)
+![CoolTerm Download](https://github.com/numanair/deej/blob/stm32-logic/Docs/Images/CoolTerm-dl.png)
 
 ### 2. Connect The Terminal
 
 Open CoolTerm and click *Options*. Make sure the baud rate is set to 9600 (usually the default). Choose the correct port from the serial port options. The correct port will vary depending on a number of factors. After choosing a port, click the connect button. You will know you have the right port when you click connect and see a stream of numbers formatted like so: 1023|0|0|460|120
 
-![CoolTerm ports](Images\coolterm_ports.png)
+![CoolTerm ports](https://github.com/numanair/deej/blob/stm32-logic/Docs/Images/coolterm_ports.png)
 
 ### 3. Create and Send the New Configuration
 
@@ -38,7 +38,7 @@ The format for fader assignment is a list of CCs followed by a list of channels.
 
 To send this configuration to the mixer, use the "send string" feature of CoolTerm. I recommend saving your new configuration in a text file and pasting it into the terminal. This makes it easier to change it or send it again. To send the string, either copy it and paste it into the main window, or click *Send String* from the *Connection* menu.
 
-![CoolTerm connect and send](Images\coolterm_connect+send.png)
+![CoolTerm connect and send](https://github.com/numanair/deej/blob/stm32-logic/Docs/Images/coolterm_connect+send.png)
 
 As soon as you send the string, the mixer will report back the new settings in the terminal. The stream of numbers will resume after a moment, but MIDI control should be uninterrupted even before that.  
 
