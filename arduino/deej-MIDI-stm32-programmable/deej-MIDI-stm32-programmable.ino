@@ -18,8 +18,10 @@ const uint8 NUM_SLIDERS = 5;
 // Potentiometer pins assignment
 const uint8 analogInputs[NUM_SLIDERS] = {0, 1, 2, 3, 4};
 
+// CC 1, 11, 7, 14, 21
+
 uint8 midi_channel[NUM_SLIDERS] = {1, 1, 1, 1, 1}; // 1 through 16
-uint8 cc_command[NUM_SLIDERS] = {7, 19, 21, 11, 1}; // MIDI CC number
+uint8 cc_command[NUM_SLIDERS] = {1, 11, 7, 14, 21}; // MIDI CC number
 
 const byte MAX_RECEIVE_LENGTH = (NUM_SLIDERS * 3 - 1) * 2 + 1 + 6;
 char receivedChars[MAX_RECEIVE_LENGTH];
@@ -35,7 +37,7 @@ bool newData = false;
 
 // Adjusts linearity correction for my specific potentiometers.
 // 1 = fully linear but jittery. 0.7 is about max for no jitter.
-const float correctionMultiplier = 0.65;
+const float correctionMultiplier = 0.60;
 const uint8 threshold = 40; // 32ish
 
 // measured output every equal 5mm increment in 12-bit. Minimum and maximum values are not affected by correctionMultiplier.
