@@ -65,11 +65,11 @@ bool prog_end = 0;
 bool deej = 1;
 int eeprom_read = 0;
 int data_write = 0;
-uint16_t addressWriteCC = 0x20;
-uint16_t addressWriteChan = addressWriteCC + NUM_SLIDERS;
+int addressWriteCC = 20;
+int addressWriteChan = addressWriteCC + NUM_SLIDERS;
 
-Neotimer mytimer = Neotimer(10);      // ms
-Neotimer mytimer2 = Neotimer(15000);  // ms
+Neotimer mytimer = Neotimer(10);     // ms
+Neotimer mytimer2 = Neotimer(5000);  // ms
 USBMIDI midi;
 USBCompositeSerial CompositeSerial;
 
@@ -113,9 +113,9 @@ void setup() {
   midi.begin();
   CompositeSerial.begin(9600);
 
-  delay(5000);
+  delay(3000);
   // EEPROM setup:
-  const int addressFlag = 0x10;
+  const int addressFlag = 10;
   // add >= 127 check?
   if (EEPROM.read(addressFlag) == 200) {
     // EEPROM already set. Reading.
@@ -170,24 +170,12 @@ void loop() {
 
 void writeToEEPROM(int addressRead, byte byteArray[], int arraySize) {
   for (int i = 0; i < NUM_SLIDERS; ++i) {
-    //    uint16_t e_data;
-    //    CompositeSerial.println("eeprom writing");
-    //    EEPROM.write(addressWriteCC, data_write);
-
-    //    CompositeSerial.println("reading");
-    //    eeprom_read = EEPROM.read(addressWriteCC, &e_data);
-    //    CompositeSerial.print("eeprom: ");
-    //    CompositeSerial.println(e_data, HEX);
-    //    ++data_write;
-
-    uint8_t current_val = EEPROM.read(addressRead);
-    // CompositeSerial.print("current_val: ");
-    // CompositeSerial.println(current_val);
-    if (current_val != byteArray[i]) {
-      EEPROM.write(addressRead, byteArray[i]);
-      CompositeSerial.println(byteArray[i]);
-      ++addressRead;
-    }
+    // uint8_t current_val = EEPROM.read(addressRead);
+    // if (current_val != byteArray[i]) {
+    EEPROM.write(addressRead, byteArray[i]);
+    CompositeSerial.println(byteArray[i]);
+    ++addressRead;
+    // }
   }
 }
 
