@@ -13,6 +13,8 @@
 // https://www.midi.org/specifications-old/item/table-3-control-change-messages-data-bytes-2
 // https://anotherproducer.com/online-tools-for-musicians/midi-cc-list/
 
+const String firmwareVersion = "v1.0.0";
+
 // Number of potentiometers or faders
 const uint8 NUM_SLIDERS = 5;
 
@@ -54,22 +56,19 @@ float idealOutputValues[arrayQty] = {0,    341,  682,  1024, 1365, 1706, 2048,
 // Note: 4095 = 2^12 - 1 (the maximum value that can be represented by
 // a 12-bit unsigned number
 
-// const uint8 MAX_RECEIVE_LENGTH = NUM_SLIDERS * 3 - 1;
-//  static char incoming_message[MAX_RECEIVE_LENGTH];
-
 int old_value[NUM_SLIDERS] = {0};
 int new_value[NUM_SLIDERS] = {0};
 float analogSliderValues[NUM_SLIDERS];
 const int MAX_MESSAGE_LENGTH = NUM_SLIDERS * 6;  // sliders * 00:00,
 bool prog_end = 0;
-bool deej = 1;
+int deej = 1;  // 1=enabled 0=paused -1=disabled
 int eeprom_read = 0;
 int data_write = 0;
 int addressWriteCC = 20;
 int addressWriteChan = addressWriteCC + NUM_SLIDERS;
 
 Neotimer mytimer = Neotimer(10);  // ms ADC polling interval
-Neotimer mytimer2 = Neotimer(3000);
+Neotimer mytimer2 = Neotimer(2000);
 // ms delay before resuming Deej output.
 // Also prevents rapid EEPROM writes.
 
@@ -125,6 +124,7 @@ void setup() {
     CompositeSerial.println("EEPROM already set. Reading");
     readFromEEPROM(addressWriteCC, cc_command, NUM_SLIDERS);      // CC
     readFromEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS);  // Channel
+    printSettings();  // print settings to serial
   } else {
     // First run, set EEPROM data to defaults
     CompositeSerial.println("First run, set EEPROM data to defaults");
@@ -141,17 +141,21 @@ void loop() {
   if (mytimer.repeat()) {
     updateSliderValues();  // Gets new slider values
     filteredAnalog();      // MIDI
-    if (deej) {
-      // sendSliderValues();  // Deej Serial
+    if (deej > 0) {
+      sendSliderValues();  // Deej Serial
     } else if (mytimer2.done()) {
       if (prog_end) {
         writeToEEPROM(addressWriteCC, cc_command, NUM_SLIDERS);
         writeToEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS);
-        CompositeSerial.println("PROG END");
-        CompositeSerial.println("RESUMING DEEJ");
+        CompositeSerial.println("MIDI settings saved");
         prog_end = 0;
+        if (deej > 0) {
+          CompositeSerial.println("Resuming Deej");
+        }
       }
-      deej = 1;
+      if (deej >= 0) {
+        deej = 1;  // if deej paused then resume
+      }
     }
   }
   recvWithStartEndMarkers();
@@ -160,7 +164,9 @@ void loop() {
     // this temporary copy is necessary to protect the original data
     // because strtok() used in parseData() replaces the commas with \0
     parseData();
-    deej = 0;
+    if (deej >= 0) {
+      deej = 0;
+    }
     mytimer2.reset();
     mytimer2.start();
 
@@ -198,13 +204,16 @@ void recvWithStartEndMarkers() {
   static byte ndx = 0;
   char startMarker = '<';
   char endMarker = '>';
+  char retSettings = 'c';  // print settings command
+  char retVersion = 'v';   // print firmware version
+  char togDeej = 'd';      // toggle Deej
   char rc;
 
   while (CompositeSerial.available() > 0 && newData == false) {
     rc = CompositeSerial.read();
 
     if (recvInProgress == true) {
-      if (rc != endMarker) {
+      if (rc != endMarker && rc != retSettings) {
         receivedChars[ndx] = rc;
         ndx++;
         if (ndx >= MAX_RECEIVE_LENGTH) {
@@ -222,15 +231,29 @@ void recvWithStartEndMarkers() {
       recvInProgress = true;
     }
 
-    else if (rc == 'c') {
-      // print settings
+    else if (rc == retSettings) {
       printSettings();
+    }
+
+    else if (rc == retVersion) {
+      CompositeSerial.println(firmwareVersion);
+    }
+
+    else if (rc == togDeej) {
+      if (deej > 0) {
+        deej = -1;  // disable deej serial output
+        CompositeSerial.println("Deej disabled.");
+      }
+      else if (deej < 0) {
+        deej = 1;  // re-enable deej serial output
+        CompositeSerial.println("Deej enabled.");
+      }
     }
   }
 }
 
 // <CC,CC,CC,CC,CC:CH,CH,CH,CH,CH>
-// <07,14,14,14,14>:01,01,01,01,01
+// <07,14,14,14,14>:01,01,01,01,01>
 
 void parseData() {
   // split the data into its parts and recombine
