@@ -68,8 +68,11 @@ int data_write = 0;
 int addressWriteCC = 20;
 int addressWriteChan = addressWriteCC + NUM_SLIDERS;
 
-Neotimer mytimer = Neotimer(10);     // ms
-Neotimer mytimer2 = Neotimer(5000);  // ms
+Neotimer mytimer = Neotimer(10);  // ms ADC polling interval
+Neotimer mytimer2 = Neotimer(3000);
+// ms delay before resuming Deej output.
+// Also prevents rapid EEPROM writes.
+
 USBMIDI midi;
 USBCompositeSerial CompositeSerial;
 
@@ -78,8 +81,8 @@ void updateSliderValues();
 void filteredAnalog();
 void parseData();
 void recvWithStartEndMarkers();
-void printMIDI_CC();
-void printMIDI_CHAN();
+void printArray();
+void printSettings();
 void writeToEEPROM();
 void readFromEEPROM();
 
@@ -158,12 +161,14 @@ void loop() {
     // because strtok() used in parseData() replaces the commas with \0
     parseData();
     deej = 0;
-    CompositeSerial.println("New MIDI settings:");
     mytimer2.reset();
     mytimer2.start();
+
+    // Output MIDI settings to serial in the input format
+    CompositeSerial.println("New MIDI settings:");
+    printSettings();
+
     prog_end = 1;
-    printMIDI_CC();
-    printMIDI_CHAN();
     newData = false;
   }
 }
@@ -173,21 +178,19 @@ void writeToEEPROM(int addressRead, byte byteArray[], int arraySize) {
     // uint8_t current_val = EEPROM.read(addressRead);
     // if (current_val != byteArray[i]) {
     EEPROM.write(addressRead, byteArray[i]);
-    CompositeSerial.println(byteArray[i]);
     ++addressRead;
     // }
   }
 }
 
 void readFromEEPROM(int addressRead, byte byteArray[], int arraySize) {
-  CompositeSerial.print("eeprom: ");
   for (int i = 0; i < NUM_SLIDERS; ++i) {
     byteArray[i] = EEPROM.read(addressRead);
+    if (byteArray[i] > 127) {
+      byteArray[i] = 127;
+    }
     ++addressRead;
-    CompositeSerial.print(byteArray[i]);
-    CompositeSerial.print(" , ");
   }
-  CompositeSerial.print('\n');
 }
 
 void recvWithStartEndMarkers() {
@@ -217,6 +220,11 @@ void recvWithStartEndMarkers() {
 
     else if (rc == startMarker) {
       recvInProgress = true;
+    }
+
+    else if (rc == 'c') {
+      // print settings
+      printSettings();
     }
   }
 }
@@ -264,26 +272,23 @@ void parseData() {
   }  // End Channel code
 }
 
-void printMIDI_CC() {
-  CompositeSerial.println("MIDI CC:");
-  for (int i = 0; i < NUM_SLIDERS; i++) {
-    CompositeSerial.print(cc_command[i]);
-    if (i < NUM_SLIDERS - 1) {
-      CompositeSerial.print(", ");
+void printArray(byte inputArray[], int arraySize) {
+  for (int i = 0; i < arraySize; i++) {
+    CompositeSerial.print(inputArray[i]);
+    if (i < arraySize - 1) {
+      CompositeSerial.print(",");
+      // #,#,#,#...
     }
   }
-  CompositeSerial.print('\n');
 }
 
-void printMIDI_CHAN() {
-  CompositeSerial.println("MIDI CHANNEL:");
-  for (int i = 0; i < NUM_SLIDERS; i++) {
-    CompositeSerial.print(midi_channel[i]);
-    if (i < NUM_SLIDERS - 1) {
-      CompositeSerial.print(", ");
-    }
-  }
-  CompositeSerial.print('\n');
+void printSettings() {
+  CompositeSerial.print("<");
+  printArray(cc_command, NUM_SLIDERS);
+  CompositeSerial.print(":");
+  printArray(midi_channel, NUM_SLIDERS);
+  CompositeSerial.print(">");
+  CompositeSerial.print('\n');  // newline
 }
 
 void filteredAnalog() {
