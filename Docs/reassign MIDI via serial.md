@@ -6,7 +6,7 @@ This document describes the steps for changing what MIDI command each fader send
 
 During this process make sure no other **serial** software attempts to connect to the mixer automatically. Serial only supports one connection at a time (it is seperate from the MIDI connection, so that can safely remain active).
 
-Support for permanently saving settings is not yet implemented, so unplugging or rebooting will cause the mixer to return to the default configuration. If possible, use mapping features within your audio software.
+If you have a 1st edition mixer (shipped before May 20th, 2022), unplugging or rebooting will cause the mixer to return to the default configuration. If possible, use mapping features within your audio software. This version shows up as "Maple" in your software.
 
 ## Fader Assignment Steps
 
