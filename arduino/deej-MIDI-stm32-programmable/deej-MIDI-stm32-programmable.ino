@@ -95,11 +95,11 @@ void setup() {
   USBComposite.clear();  // clear any plugins previously registered
   CompositeSerial.registerComponent();
   midi.registerComponent();
+  USBComposite.setVendorId(0xFEED);  // STMicroelectronics
+  USBComposite.setProductId(0xF1CC);
+  USBComposite.setManufacturerString("Return to Paradise");
+  USBComposite.setProductString("MIX5R Pro");
   USBComposite.begin();
-  USBComposite.setVendorId(0x0483);  // STMicroelectronics
-  USBComposite.setProductId(0xf7cc);
-  USBComposite.setManufacturerString("STMicroelectronics");
-  USBComposite.setProductString("MIDI-MIX5R");
 
   // multiplier correction
   for (size_t i = 0; i < arrayQty; i++) {
