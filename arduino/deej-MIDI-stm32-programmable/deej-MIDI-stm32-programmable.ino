@@ -39,12 +39,12 @@ bool newData = false;
 // Adjusts linearity correction for my specific potentiometers.
 // 1 = fully linear but jittery. 0.7 is about max for no jitter.
 const float correctionMultiplier = 0.60;
-const uint8_t threshold = 40;  // 32ish
+const uint8_t threshold = 32;  // 32ish
 
 // measured output every equal 5mm increment in 12-bit. Minimum and maximum
 // values are not affected by correctionMultiplier.
-const float measuredInput[] = {14,   50,   165,  413,  907,  1450, 1975,
-                               2545, 3095, 3645, 3923, 4030, 4088};
+const float measuredInput[] = {19,   50,   165,  413,  907,  1450, 1975,
+                               2545, 3095, 3645, 3923, 4030, 4082};
 
 // Calculate number of elements in the MultiMap arrays
 const int arrayQty = sizeof(measuredInput) / sizeof(measuredInput[0]);
@@ -122,14 +122,14 @@ void setup() {
   if (EEPROM.read(addressFlag) == 200) {
     // EEPROM already set. Reading.
     CompositeSerial.println("EEPROM already set. Reading");
-    readFromEEPROM(addressWriteCC, cc_command, NUM_SLIDERS);      // CC
-    readFromEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS);  // Channel
+    readFromEEPROM(addressWriteCC, cc_command, NUM_SLIDERS, 127);     // CC
+    readFromEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS, 16);  // Channel
     printSettings();  // print settings to serial
   } else {
     // First run, set EEPROM data to defaults
     CompositeSerial.println("First run, set EEPROM data to defaults");
-    writeToEEPROM(addressWriteCC, cc_command, NUM_SLIDERS);      // CC
-    writeToEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS);  // Channel
+    writeToEEPROM(addressWriteCC, cc_command, NUM_SLIDERS, 127);      // CC
+    writeToEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS, 16);  // Channel
     EEPROM.write(addressFlag, 200);
   }
 
@@ -145,8 +145,8 @@ void loop() {
       sendSliderValues();  // Deej Serial
     } else if (mytimer2.done()) {
       if (prog_end) {
-        writeToEEPROM(addressWriteCC, cc_command, NUM_SLIDERS);
-        writeToEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS);
+        writeToEEPROM(addressWriteCC, cc_command, NUM_SLIDERS, 127);
+        writeToEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS, 16);
         CompositeSerial.println("MIDI settings saved");
         prog_end = 0;
         if (deej > 0) {
@@ -179,21 +179,24 @@ void loop() {
   }
 }
 
-void writeToEEPROM(int addressRead, byte byteArray[], int arraySize) {
+void writeToEEPROM(int addressRead, byte byteArray[], int arraySize, int max) {
   for (int i = 0; i < NUM_SLIDERS; ++i) {
     // uint8_t current_val = EEPROM.read(addressRead);
     // if (current_val != byteArray[i]) {
+    if (byteArray[i] > max) {
+      byteArray[i] = max;
+    }
     EEPROM.write(addressRead, byteArray[i]);
     ++addressRead;
     // }
   }
 }
 
-void readFromEEPROM(int addressRead, byte byteArray[], int arraySize) {
+void readFromEEPROM(int addressRead, byte byteArray[], int arraySize, int max) {
   for (int i = 0; i < NUM_SLIDERS; ++i) {
     byteArray[i] = EEPROM.read(addressRead);
-    if (byteArray[i] > 127) {
-      byteArray[i] = 127;
+    if (byteArray[i] > max) {
+      byteArray[i] = max;
     }
     ++addressRead;
   }
@@ -243,8 +246,7 @@ void recvWithStartEndMarkers() {
       if (deej > 0) {
         deej = -1;  // disable deej serial output
         CompositeSerial.println("Deej disabled.");
-      }
-      else if (deej < 0) {
+      } else if (deej < 0) {
         deej = 1;  // re-enable deej serial output
         CompositeSerial.println("Deej enabled.");
       }
