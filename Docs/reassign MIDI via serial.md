@@ -61,6 +61,6 @@ If you want to make a small change, first send the character `c` to retrieve the
 
 ![CoolTerm connect and send](https://github.com/numanair/deej/blob/stm32-logic-saving/Docs/Images/coolterm_connect+send.png)
 
-As soon as you send the string, the mixer will report back the new settings in the terminal. The stream of numbers will resume after a moment, but MIDI control should be uninterrupted even before that.  
+As soon as you send the string, the mixer will report back the new settings in the terminal. After a small delay the settings are saved to the MIX5R Pro.
 
-If you are satisfied with the new settings you can close the serial terminal (CoolTerm). If it asks to save it is safe to click no.
+If you are satisfied with the new settings you may close the serial terminal (CoolTerm). If it asks to save it is safe to click no.
