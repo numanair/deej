@@ -39,6 +39,8 @@ Any serial terminal can be used, but for this tutorial we will use CoolTerm. The
 
 Open CoolTerm and click *Options*. Make sure the baud rate is set to 9600 (usually the default). Choose the correct port from the serial port options. The correct port will vary depending on a number of factors. If you are using Windows, you may check device manager to find which port is assigned. After choosing a port, click the connect button. You will know you have the right port when you click connect and see a stream of numbers formatted like so: 1023|0|0|460|120
 
+If you are on Windows and do not see a COM port for the mixer, please follow these [driver installation instructions](https://github.com/numanair/deej/blob/stm32-logic/Docs/Windows%20Driver%20Install%20for%20MIDI%20Mixer.md).
+
 To pause this output and better see the messages from the mixer, send `d`. If you wish to resume this output for use with Deej, simply send `d` again.
 
 ![CoolTerm ports](https://github.com/numanair/deej/blob/stm32-logic-saving/Docs/Images/coolterm_ports.png)
