@@ -14,7 +14,7 @@ const uint8 analogInputs[NUM_SLIDERS] = {0, 1, 2, 3, 4};
 
 // Adjusts linearity correction for my specific potentiometers.
 // 1 = fully linear but jittery. 0.7 is about max for no jitter.
-const float correctionMultiplier = 0.70;
+const float correctionMultiplier = 0.60;
 const uint8 threshold = 1;
 
 // measured output every equal 5mm increment in 12-bit. Minimum and maximum values are not affected by correctionMultiplier.
@@ -51,21 +51,12 @@ void setup() {
   USBComposite.clear(); // clear any plugins previously registered
   CompositeSerial.registerComponent();
   midi.registerComponent();
-  USBComposite.begin();
-//  USBComposite.setProductId(0x0031);
-//  USBComposite.setProductId(0x0483);
-//  USBComposite.setProductString("MIX5R");
 
-  USBComposite.setVendorId(0x0483); // STMicroelectronics
+  USBComposite.setVendorId(0xFEED);
   USBComposite.setProductId(0xf7cc);
   USBComposite.setManufacturerString("STMicroelectronics");
-  USBComposite.setProductString("MIDI-MIX5R");
-
-//  USBComposite.setVendorId(uint16 vendor);
-//  USBComposite.setProductId(uint16 product);
-//  USBComposite.setManufacturerString(const char* manufacturer);
-//  USBComposite.setProductString(const char* product);
-//  USBComposite.setSerialString(const char* serialNumber);
+  USBComposite.setProductString("MIX5R+");
+  USBComposite.begin();
 
   // multiplier correction
   for (size_t i = 0; i < arrayQty; i++) {
@@ -115,9 +106,14 @@ void updateSliderValues() {
 
 // Deej Serial Support
 void sendSliderValues() {
+  int outputval[NUM_SLIDERS] = {0};
   String builtString = String("");
   for (int i = 0; i < NUM_SLIDERS; i++) {
-    builtString += String((int)round(analogSliderValues[i] / 4));
+    outputval[i] = round(analogSliderValues[i] / 4);
+    if (outputval[i] > 1023){
+      outputval[i] = 1023;
+    }
+    builtString += String((int)outputval[i]);
     if (i < NUM_SLIDERS - 1) {
       builtString += String("|");
     }
