@@ -9,7 +9,7 @@
 // <CC,CC,CC,CC,CC:CH,CH,CH,CH,CH>
 // For example: <07,07,07,07,07:01,02,03,04,05>
 // This sets all faders to MIDI CC 7 (volume control) and assigns each to
-// channel 1-5 Channel can be 1-16
+// channel 1-5. CC max is 127 and channel can be 1-16
 // https://www.midi.org/specifications-old/item/table-3-control-change-messages-data-bytes-2
 // https://anotherproducer.com/online-tools-for-musicians/midi-cc-list/
 
@@ -118,7 +118,6 @@ void setup() {
   delay(3000);
   // EEPROM setup:
   const int addressFlag = 10;
-  // add >= 127 check?
   if (EEPROM.read(addressFlag) == 200) {
     // EEPROM already set. Reading.
     CompositeSerial.println("EEPROM already set. Reading");
@@ -128,7 +127,7 @@ void setup() {
   } else {
     // First run, set EEPROM data to defaults
     CompositeSerial.println("First run, set EEPROM data to defaults");
-    writeToEEPROM(addressWriteCC, cc_command, NUM_SLIDERS, 127);      // CC
+    writeToEEPROM(addressWriteCC, cc_command, NUM_SLIDERS, 127);     // CC
     writeToEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS, 16);  // Channel
     EEPROM.write(addressFlag, 200);
   }
@@ -181,14 +180,12 @@ void loop() {
 
 void writeToEEPROM(int addressRead, byte byteArray[], int arraySize, int max) {
   for (int i = 0; i < NUM_SLIDERS; ++i) {
-    // uint8_t current_val = EEPROM.read(addressRead);
-    // if (current_val != byteArray[i]) {
     if (byteArray[i] > max) {
+      // Keeps CC/channel within limit
       byteArray[i] = max;
     }
     EEPROM.write(addressRead, byteArray[i]);
     ++addressRead;
-    // }
   }
 }
 
@@ -196,6 +193,7 @@ void readFromEEPROM(int addressRead, byte byteArray[], int arraySize, int max) {
   for (int i = 0; i < NUM_SLIDERS; ++i) {
     byteArray[i] = EEPROM.read(addressRead);
     if (byteArray[i] > max) {
+      // Keeps CC/channel within limit
       byteArray[i] = max;
     }
     ++addressRead;
