@@ -43,22 +43,22 @@ const uint8_t threshold = 32;  // 32ish
 
 // measured output every equal 5mm increment in 12-bit. Minimum and maximum
 // values are not affected by correctionMultiplier.
-const float measuredInput[] = {19,   50,   165,  413,  907,  1450, 1975,
+const uint16_t measuredInput[] = {19,   50,   165,  413,  907,  1450, 1975,
                                2545, 3095, 3645, 3923, 4030, 4082};
 
 // Calculate number of elements in the MultiMap arrays
-const int arrayQty = sizeof(measuredInput) / sizeof(measuredInput[0]);
-float adjustedinputval[arrayQty] = {0};
+const uint8_t arrayQty = sizeof(measuredInput) / sizeof(measuredInput[0]);
+uint16_t adjustedinputval[arrayQty] = {0}; // Same type as measuredInput
 
 // Probably no need to change these calculated values
-float idealOutputValues[arrayQty] = {0,    341,  682,  1024, 1365, 1706, 2048,
+uint16_t idealOutputValues[arrayQty] = {0,    341,  682,  1024, 1365, 1706, 2048,
                                      2389, 2730, 3072, 3413, 3754, 4095};
 // Note: 4095 = 2^12 - 1 (the maximum value that can be represented by
 // a 12-bit unsigned number
 
 int old_value[NUM_SLIDERS] = {0};
 int new_value[NUM_SLIDERS] = {0};
-float analogSliderValues[NUM_SLIDERS];
+int analogSliderValues[NUM_SLIDERS];
 const int MAX_MESSAGE_LENGTH = NUM_SLIDERS * 6;  // sliders * 00:00,
 bool prog_end = 0;
 int deej = 1;  // 1=enabled 0=paused -1=disabled
@@ -341,7 +341,7 @@ void filteredAnalog() {
 void updateSliderValues() {
   for (int i = 0; i < NUM_SLIDERS; i++) {
     analogSliderValues[i] =
-        multiMap<float>(analogRead(analogInputs[i]), adjustedinputval,
+        multiMap<uint16>(analogRead(analogInputs[i]), adjustedinputval,
                         idealOutputValues, arrayQty);
   }
 }
