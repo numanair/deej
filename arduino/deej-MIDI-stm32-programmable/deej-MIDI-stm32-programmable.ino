@@ -62,8 +62,6 @@ int analogSliderValues[NUM_SLIDERS];
 const int MAX_MESSAGE_LENGTH = NUM_SLIDERS * 6;  // sliders * 00:00,
 bool prog_end = 0;
 int deej = 1;  // 1=enabled 0=paused -1=disabled
-int eeprom_read = 0;
-int data_write = 0;
 int addressWriteCC = 20;
 int addressWriteChan = addressWriteCC + NUM_SLIDERS;
 
