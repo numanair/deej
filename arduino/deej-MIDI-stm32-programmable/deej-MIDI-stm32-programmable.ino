@@ -2,7 +2,7 @@
 #include <EEPROM.h>
 #include <USBComposite.h>
 #include <neotimer.h>
-
+#include <STM32ADC.h>
 #include "MultiMap.h"
 
 // This sketch uses serial input in the following format:
@@ -13,10 +13,10 @@
 // https://www.midi.org/specifications-old/item/table-3-control-change-messages-data-bytes-2
 // https://anotherproducer.com/online-tools-for-musicians/midi-cc-list/
 
-const String firmwareVersion = "v1.0.0";
+const String firmwareVersion = "v1.0.1";
 
 // Number of potentiometers or faders
-const uint8 NUM_SLIDERS = 5;
+const uint8_t NUM_SLIDERS = 5;
 
 // Potentiometer pins assignment
 const uint8_t analogInputs[NUM_SLIDERS] = {0, 1, 2, 3, 4};
@@ -83,12 +83,16 @@ void printSettings();
 void writeToEEPROM();
 void readFromEEPROM();
 
+STM32ADC myADC(ADC1);
+
 void setup() {
   for (int i = 0; i < NUM_SLIDERS; i++) {
     pinMode(analogInputs[i], INPUT_ANALOG);
   }
   pinMode(PC13, OUTPUT);
   mytimer2.start();
+
+  myADC.calibrate();
 
   USBComposite.clear();  // clear any plugins previously registered
   CompositeSerial.registerComponent();
