@@ -19,7 +19,7 @@ const String firmwareVersion = "v1.0.0";
 const uint8 NUM_SLIDERS = 5;
 
 // Potentiometer pins assignment
-const uint8 analogInputs[NUM_SLIDERS] = {0, 1, 2, 3, 4};
+const uint8_t analogInputs[NUM_SLIDERS] = {0, 1, 2, 3, 4};
 
 uint8_t midi_channel[NUM_SLIDERS] = {1, 1, 1, 1, 1};   // 1 through 16
 uint8_t cc_command[NUM_SLIDERS] = {1, 11, 7, 14, 21};  // MIDI CC number
@@ -44,15 +44,15 @@ const uint8_t threshold = 32;  // 32ish
 // measured output every equal 5mm increment in 12-bit. Minimum and maximum
 // values are not affected by correctionMultiplier.
 const uint16_t measuredInput[] = {19,   50,   165,  413,  907,  1450, 1975,
-                               2545, 3095, 3645, 3923, 4030, 4082};
+                                  2545, 3095, 3645, 3923, 4030, 4082};
 
 // Calculate number of elements in the MultiMap arrays
 const uint8_t arrayQty = sizeof(measuredInput) / sizeof(measuredInput[0]);
-uint16_t adjustedinputval[arrayQty] = {0}; // Same type as measuredInput
+uint16_t adjustedinputval[arrayQty] = {0};  // Same type as measuredInput
 
 // Probably no need to change these calculated values
-uint16_t idealOutputValues[arrayQty] = {0,    341,  682,  1024, 1365, 1706, 2048,
-                                     2389, 2730, 3072, 3413, 3754, 4095};
+uint16_t idealOutputValues[arrayQty] = {
+    0, 341, 682, 1024, 1365, 1706, 2048, 2389, 2730, 3072, 3413, 3754, 4095};
 // Note: 4095 = 2^12 - 1 (the maximum value that can be represented by
 // a 12-bit unsigned number
 
@@ -316,31 +316,31 @@ void filteredAnalog() {
   for (int i = 0; i < NUM_SLIDERS; i++) {
     new_value[i] = analogSliderValues[i];  // 12-bit
     // If difference between new_value and old_value is greater than threshold,
-    // send new values
+    // then send new values
     if ((new_value[i] > old_value[i] &&
          new_value[i] - old_value[i] > threshold) ||
         (new_value[i] < old_value[i] &&
          old_value[i] - new_value[i] > threshold)) {
-      // Send MIDI
-      // convert from 12-bit to 7-bit for MIDI
-      // channel starts at 0, but midi_channel starts at 1
-      int mappedVal = map(new_value[i], 0, 4095 - (32 - 2), 0, 127);
-      if (mappedVal > 127) {
-        mappedVal = 127;
-      }
-      //      CompositeSerial.println(mappedVal);
-      midi.sendControlChange(midi_channel[i] - 1, cc_command[i], mappedVal);
       // Update old_value
       old_value[i] = new_value[i];
+      // convert from 12-bit to 7-bit for MIDI
+      new_value[i] = floor(new_value[i] / 32);
+      if (new_value[i] > 127) {
+        new_value[i] = 127;
+      }
+      // Send MIDI
+      // channel starts at 0, but midi_channel starts at 1
+      midi.sendControlChange(midi_channel[i] - 1, cc_command[i], new_value[i]);
     }
   }
 }
 
 void updateSliderValues() {
   for (int i = 0; i < NUM_SLIDERS; i++) {
+    // analogSliderValues[i] = analogRead(analogInputs[i]);
     analogSliderValues[i] =
         multiMap<uint16>(analogRead(analogInputs[i]), adjustedinputval,
-                        idealOutputValues, arrayQty);
+                         idealOutputValues, arrayQty);
   }
 }
 
