@@ -48,6 +48,8 @@ void setup() {
     pinMode(analogInputs[i], INPUT_ANALOG);
   }
 
+  myADC.calibrate();
+
   USBComposite.clear(); // clear any plugins previously registered
   CompositeSerial.registerComponent();
   midi.registerComponent();
