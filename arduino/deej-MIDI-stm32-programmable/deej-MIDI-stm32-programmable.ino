@@ -424,9 +424,8 @@ void filteredAnalog() {
       }
       // Send MIDI
       // channel starts at 0, but midi_channel starts at 1
-      midi.sendControlChange(midi_channel[i] - 1,
-                             map(cc_command[i], 0, 127, 0, cc_upper_limit[i]),
-                             new_value[i]);
+      midi.sendControlChange(midi_channel[i] - 1, cc_command[i],
+                             map(new_value[i], 0, 127, 0, cc_upper_limit[i]));
     }
   }
 }
