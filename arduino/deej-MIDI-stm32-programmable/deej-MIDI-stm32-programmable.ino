@@ -1,8 +1,9 @@
 #include <Arduino.h>
 #include <EEPROM.h>
+#include <STM32ADC.h>
 #include <USBComposite.h>
 #include <neotimer.h>
-#include <STM32ADC.h>
+
 #include "MultiMap.h"
 
 // This sketch uses serial input in the following format:
