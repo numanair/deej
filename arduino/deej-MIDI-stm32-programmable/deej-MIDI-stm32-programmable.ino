@@ -14,7 +14,7 @@
 // https://www.midi.org/specifications-old/item/table-3-control-change-messages-data-bytes-2
 // https://anotherproducer.com/online-tools-for-musicians/midi-cc-list/
 
-const String firmwareVersion = "v1.0.1";
+const String firmwareVersion = "v1.1.0";
 
 // Number of potentiometers or faders
 const uint8_t NUM_SLIDERS = 5;
@@ -25,6 +25,9 @@ const uint8_t analogInputs[NUM_SLIDERS] = {0, 1, 2, 3, 4};
 uint8_t midi_channel[NUM_SLIDERS] = {1, 1, 1, 1, 1};   // 1 through 16
 uint8_t cc_command[NUM_SLIDERS] = {1, 11, 7, 14, 21};  // MIDI CC number
 
+uint8_t cc_upper_limit[NUM_SLIDERS] = {
+    127, 127, 127, 127, 127};  // optionally limit range of MIDI CC per fader
+
 const byte MAX_RECEIVE_LENGTH = (NUM_SLIDERS * 3 - 1) * 2 + 1 + 6;
 char receivedChars[MAX_RECEIVE_LENGTH];
 char tempChars[MAX_RECEIVE_LENGTH];  // temporary array for use when parsing
@@ -34,6 +37,7 @@ char messageFromPC[MAX_RECEIVE_LENGTH] = {0};
 int integerFromPC = 0;
 char stringCC[MAX_RECEIVE_LENGTH / 2] = {0};
 char stringCHAN[MAX_RECEIVE_LENGTH / 2] = {0};
+char stringUpLimit[MAX_RECEIVE_LENGTH / 2] = {0};
 
 bool newData = false;
 
@@ -62,9 +66,11 @@ int new_value[NUM_SLIDERS] = {0};
 int analogSliderValues[NUM_SLIDERS];
 const int MAX_MESSAGE_LENGTH = NUM_SLIDERS * 6;  // sliders * 00:00,
 bool prog_end = 0;
+bool CC_CH_mode = 1;
 int deej = 1;  // 1=enabled 0=paused -1=disabled
 int addressWriteCC = 20;
 int addressWriteChan = addressWriteCC + NUM_SLIDERS;
+int addressWriteUpperLimit = addressWriteChan + NUM_SLIDERS;
 
 Neotimer mytimer = Neotimer(10);  // ms ADC polling interval
 Neotimer mytimer2 = Neotimer(2000);
@@ -81,6 +87,7 @@ void parseData();
 void recvWithStartEndMarkers();
 void printArray();
 void printSettings();
+void printLimitSettings();
 void writeToEEPROM();
 void readFromEEPROM();
 
@@ -126,13 +133,18 @@ void setup() {
     CompositeSerial.println("EEPROM already set. Reading");
     readFromEEPROM(addressWriteCC, cc_command, NUM_SLIDERS, 127);     // CC
     readFromEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS, 16);  // Channel
-    printSettings();  // print settings to serial
+    readFromEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_SLIDERS,
+                   127);   // Channel
+    printSettings();       // print settings to serial
+    printLimitSettings();  // print settings to serial
   } else {
     // First run, set EEPROM data to defaults
     CompositeSerial.println("First run, set EEPROM data to defaults");
     writeToEEPROM(addressWriteCC, cc_command, NUM_SLIDERS, 127);     // CC
     writeToEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS, 16);  // Channel
-    EEPROM.write(addressFlag, 200);
+    writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_SLIDERS,
+                  127);              // Channel
+    EEPROM.write(addressFlag, 200);  // mark EEPROM as set
   }
 
   delay(500);
@@ -165,16 +177,23 @@ void loop() {
     strcpy(tempChars, receivedChars);
     // this temporary copy is necessary to protect the original data
     // because strtok() used in parseData() replaces the commas with \0
-    parseData();
+    if (CC_CH_mode) {
+      parseData();
+      // Output MIDI settings to serial in the input format
+      CompositeSerial.println("New MIDI settings:");
+      printSettings();
+    } else {
+      parseUpperLimit();
+      // Output MIDI limuts to serial in the input format
+      CompositeSerial.println("New MIDI Limits:");
+      printLimitSettings();
+    }
+
     if (deej >= 0) {
       deej = 0;
     }
     mytimer2.reset();
     mytimer2.start();
-
-    // Output MIDI settings to serial in the input format
-    CompositeSerial.println("New MIDI settings:");
-    printSettings();
 
     prog_end = 1;
     newData = false;
@@ -208,9 +227,10 @@ void recvWithStartEndMarkers() {
   static byte ndx = 0;
   char startMarker = '<';
   char endMarker = '>';
-  char retSettings = 'c';  // print settings command
-  char retVersion = 'v';   // print firmware version
-  char togDeej = 'd';      // toggle Deej
+  char retSettings = 'c';    // print settings command
+  char retVersion = 'v';     // print firmware version
+  char togDeej = 'd';        // toggle Deej
+  char setUpperLimit = 'u';  // toggle Deej
   char rc;
 
   while (CompositeSerial.available() > 0 && newData == false) {
@@ -236,11 +256,28 @@ void recvWithStartEndMarkers() {
     }
 
     else if (rc == retSettings) {
-      printSettings();
+      if (CC_CH_mode) {
+        // Currently in CC and Channel assignment mode. Print these settings.
+        printSettings();
+      } else {
+        // Currently in limit setting mode. Print these settings.
+        printLimitSettings();
+      }
+
     }
 
     else if (rc == retVersion) {
       CompositeSerial.println(firmwareVersion);
+    }
+
+    else if (rc == setUpperLimit) {
+      // toggles saving CC/CH or setting the limits for max fader output
+      CC_CH_mode = !CC_CH_mode;
+      if (CC_CH_mode) {
+        CompositeSerial.println("CC and Channel assignment mode");
+      } else {
+        CompositeSerial.println("Upper Limits Mode");
+      }
     }
 
     else if (rc == togDeej) {
@@ -294,8 +331,51 @@ void parseData() {
     }
     integerFromPC = atoi(strtokIndx2);  // convert this part to an integer
     midi_channel[i] = integerFromPC;
-
   }  // End Channel code
+}
+
+void parseUpperLimit() {
+  // split the data into its parts and recombine
+
+  char *strtokIndx1;  // CC... / CH...
+  // char *
+  //     strtokIndx2;  // Somehow two pointers is less flash used than a single
+  //     one
+
+  strtokIndx1 = strtok(tempChars, ":");
+  // strcpy(stringUpLimit, strtokIndx1);
+  // strcpy(stringUpLimit, cc_upper_limit);
+
+  // strtokIndx1 = strtok(NULL, ":");
+  // strcpy(stringCHAN, strtokIndx1);
+
+  // Start upper limit saving
+  for (int i = 0; i < NUM_SLIDERS; i++) {
+    if (i == 0) {
+      strtokIndx1 = strtok(tempChars, ",");
+    } else if (strtokIndx1 != NULL) {
+      strtokIndx1 = strtok(NULL, ",");
+    }
+    integerFromPC = atoi(strtokIndx1);  // convert this part to an integer
+    cc_upper_limit[i] = integerFromPC;
+    if (cc_upper_limit[i] > 127) {
+      cc_upper_limit[i] = 127;
+    }
+  }
+  // End upper limit code
+
+  // stringCHAN[NUM_SLIDERS * 3] = '\0';  // NULL terminate
+
+  //   // Start Channel code
+  //   for (int i = 0; i < NUM_SLIDERS; i++) {
+  //     if (i == 0) {
+  //       strtokIndx2 = strtok(stringCHAN, ",");
+  //     } else if (strtokIndx2 != NULL) {
+  //       strtokIndx2 = strtok(NULL, ",");
+  //     }
+  //     integerFromPC = atoi(strtokIndx2);  // convert this part to an integer
+  //     midi_channel[i] = integerFromPC;
+  //   }  // End Channel code
 }
 
 void printArray(byte inputArray[], int arraySize) {
@@ -309,10 +389,19 @@ void printArray(byte inputArray[], int arraySize) {
 }
 
 void printSettings() {
+  CompositeSerial.println("MIDI assignment");
   CompositeSerial.print("<");
   printArray(cc_command, NUM_SLIDERS);
   CompositeSerial.print(":");
   printArray(midi_channel, NUM_SLIDERS);
+  CompositeSerial.print(">");
+  CompositeSerial.print('\n');  // newline
+}
+
+void printLimitSettings() {
+  CompositeSerial.println("MIDI limits");
+  CompositeSerial.print("<");
+  printArray(cc_upper_limit, NUM_SLIDERS);
   CompositeSerial.print(">");
   CompositeSerial.print('\n');  // newline
 }
@@ -335,7 +424,9 @@ void filteredAnalog() {
       }
       // Send MIDI
       // channel starts at 0, but midi_channel starts at 1
-      midi.sendControlChange(midi_channel[i] - 1, cc_command[i], new_value[i]);
+      midi.sendControlChange(midi_channel[i] - 1,
+                             map(cc_command[i], 0, 127, 0, cc_upper_limit[i]),
+                             new_value[i]);
     }
   }
 }
