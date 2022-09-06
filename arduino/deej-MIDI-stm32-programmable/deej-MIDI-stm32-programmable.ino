@@ -62,6 +62,8 @@ uint16_t idealOutputValues[arrayQty] = {
 
 int old_value[NUM_SLIDERS] = {0};
 int new_value[NUM_SLIDERS] = {0};
+int old_midi_value[NUM_SLIDERS] = {0};
+int new_midi_value[NUM_SLIDERS] = {0};
 int analogSliderValues[NUM_SLIDERS];
 const int MAX_MESSAGE_LENGTH = NUM_SLIDERS * 6;  // sliders * 00:00,
 bool prog_end = 0;
@@ -429,14 +431,23 @@ void filteredAnalog() {
       old_value[i] = new_value[i];
       // convert from 12-bit to 7-bit for MIDI
       new_value[i] = floor(new_value[i] / 32);
-      if (new_value[i] > 127) {
-        new_value[i] = 127;
+      // if (new_value[i] > 127) {
+      //   new_value[i] = 127;  // cap output to MIDI range
+      // }
+
+      new_midi_value[i] =
+          map(new_value[i], 0, 127, cc_lower_limit[i], cc_upper_limit[i]);
+      if (new_midi_value[i] != old_midi_value[i]) {
+        // Update old_midi_value
+        old_midi_value[i] = new_midi_value[i];
+        if (new_midi_value[i] > 127) {
+          new_midi_value[i] = 127;  // cap output to MIDI range
+        }
+        // Send MIDI
+        // channel starts at 0, but midi_channel starts at 1
+        midi.sendControlChange(midi_channel[i] - 1, cc_command[i],
+                               new_midi_value[i]);
       }
-      // Send MIDI
-      // channel starts at 0, but midi_channel starts at 1
-      midi.sendControlChange(
-          midi_channel[i] - 1, cc_command[i],
-          map(new_value[i], 0, 127, cc_lower_limit[i], cc_upper_limit[i]));
     }
   }
 }
