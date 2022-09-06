@@ -14,7 +14,7 @@
 // https://www.midi.org/specifications-old/item/table-3-control-change-messages-data-bytes-2
 // https://anotherproducer.com/online-tools-for-musicians/midi-cc-list/
 
-const String firmwareVersion = "v1.1.0";
+const String firmwareVersion = "v1.1.0-dev";
 
 // Number of potentiometers or faders
 const uint8_t NUM_SLIDERS = 5;
@@ -25,6 +25,8 @@ const uint8_t analogInputs[NUM_SLIDERS] = {0, 1, 2, 3, 4};
 uint8_t midi_channel[NUM_SLIDERS] = {1, 1, 1, 1, 1};   // 1 through 16
 uint8_t cc_command[NUM_SLIDERS] = {1, 11, 7, 14, 21};  // MIDI CC number
 
+uint8_t cc_lower_limit[NUM_SLIDERS] = {
+    0, 0, 0, 0, 0};  // optionally limit range of MIDI CC per fader
 uint8_t cc_upper_limit[NUM_SLIDERS] = {
     127, 127, 127, 127, 127};  // optionally limit range of MIDI CC per fader
 
@@ -35,7 +37,6 @@ char tempChars[MAX_RECEIVE_LENGTH];  // temporary array for use when parsing
 // variables to hold the parsed data
 char messageFromPC[MAX_RECEIVE_LENGTH] = {0};
 int integerFromPC = 0;
-char stringUpLimit[MAX_RECEIVE_LENGTH / 2] = {0};
 
 bool newData = false;
 
@@ -69,10 +70,11 @@ int deej = 1;  // 1=enabled 0=paused -1=disabled
 int addressWriteCC = 20;
 int addressWriteChan = addressWriteCC + NUM_SLIDERS;
 int addressWriteUpperLimit = addressWriteChan + NUM_SLIDERS;
+int addressWriteLowerLimit = addressWriteUpperLimit + NUM_SLIDERS;
 
 Neotimer mytimer = Neotimer(10);  // ms ADC polling interval
 Neotimer mytimer2 = Neotimer(2000);
-// ms delay before resuming Deej output.
+// ms delay before saving settings/resuming Deej output.
 // Also prevents rapid EEPROM writes.
 
 USBMIDI midi;
@@ -131,8 +133,10 @@ void setup() {
     CompositeSerial.println("EEPROM already set. Reading");
     readFromEEPROM(addressWriteCC, cc_command, NUM_SLIDERS, 127);     // CC
     readFromEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS, 16);  // Channel
+    readFromEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_SLIDERS,
+                   127);  // Lower bound of each fader output
     readFromEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_SLIDERS,
-                   127);   // Channel
+                   127);   // Upper bound of each fader output
     printSettings();       // print settings to serial
     printLimitSettings();  // print settings to serial
   } else {
@@ -140,8 +144,10 @@ void setup() {
     CompositeSerial.println("First run, set EEPROM data to defaults");
     writeToEEPROM(addressWriteCC, cc_command, NUM_SLIDERS, 127);     // CC
     writeToEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS, 16);  // Channel
+    writeToEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_SLIDERS,
+                  127);  // Lower bound of each fader output
     writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_SLIDERS,
-                  127);              // Channel
+                  127);              // Upper bound of each fader output
     EEPROM.write(addressFlag, 200);  // mark EEPROM as set
   }
 
@@ -159,6 +165,8 @@ void loop() {
       if (prog_end) {
         writeToEEPROM(addressWriteCC, cc_command, NUM_SLIDERS, 127);
         writeToEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS, 16);
+        writeToEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_SLIDERS, 127);
+        writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_SLIDERS, 127);
         CompositeSerial.println("MIDI settings saved");
         prog_end = 0;
         if (deej > 0) {
@@ -181,7 +189,7 @@ void loop() {
       CompositeSerial.println("New MIDI settings:");
       printSettings();
     } else {
-      parseUpperLimit();
+      parseFaderLimits();
       // Output MIDI limuts to serial in the input format
       CompositeSerial.println("New MIDI Limits:");
       printLimitSettings();
@@ -272,9 +280,9 @@ void recvWithStartEndMarkers() {
       // toggles saving CC/CH or setting the limits for max fader output
       CC_CH_mode = !CC_CH_mode;
       if (CC_CH_mode) {
-        CompositeSerial.println("CC and Channel assignment mode");
+        CompositeSerial.println("CC & Channel Assignment Mode");
       } else {
-        CompositeSerial.println("Upper Limits Mode");
+        CompositeSerial.println("Limits Mode");
       }
     }
 
@@ -306,6 +314,7 @@ void parseData() {
   strtokIndx1 = strtok(tempChars, ":");
   strcpy(stringCC, strtokIndx1);
 
+  // rerun strtok() using the same tempChars to find the next token
   strtokIndx1 = strtok(NULL, ":");
   strcpy(stringCHAN, strtokIndx1);
 
@@ -314,7 +323,7 @@ void parseData() {
     if (i == 0) {
       strtokIndx2 = strtok(stringCC, ",");
     } else if (strtokIndx1 != NULL) {
-      strtokIndx2 = strtok(NULL, ",");
+      strtokIndx2 = strtok(NULL, ",");  // next token
     }
     integerFromPC = atoi(strtokIndx2);  // convert this part to an integer
     cc_command[i] = integerFromPC;
@@ -328,42 +337,101 @@ void parseData() {
     if (i == 0) {
       strtokIndx2 = strtok(stringCHAN, ",");
     } else if (strtokIndx2 != NULL) {
-      strtokIndx2 = strtok(NULL, ",");
+      strtokIndx2 = strtok(NULL, ",");  // next token
     }
     integerFromPC = atoi(strtokIndx2);  // convert this part to an integer
     midi_channel[i] = integerFromPC;
   }  // End Channel code
 }
 
-void parseUpperLimit() {
+void parseFaderLimits() {
   // split the data into its parts and recombine
 
+  //////////
+  //////////
+  char stringLowerLim[MAX_RECEIVE_LENGTH / 2] = {0};
+  char stringUpperLim[MAX_RECEIVE_LENGTH / 2] = {0};
+
   char *strtokIndx1;  // CC... / CH...
-  // char *
-  //     strtokIndx2;  // Somehow two pointers is less flash used than a single
-  //     one
+  char *
+      strtokIndx2;  // Somehow two pointers is less flash used than a single one
 
   strtokIndx1 = strtok(tempChars, ":");
-  // strcpy(stringUpLimit, strtokIndx1);
-  // strcpy(stringUpLimit, cc_upper_limit);
+  strcpy(stringLowerLim, strtokIndx1);
 
-  // strtokIndx1 = strtok(NULL, ":");
-  // strcpy(stringCHAN, strtokIndx1);
+  // rerun strtok() using the same tempChars to find the next token
+  strtokIndx1 = strtok(NULL, ":");
+  strcpy(stringUpperLim, strtokIndx1);
 
-  // Start upper limit saving
+  // Start new lower limit code
   for (int i = 0; i < NUM_SLIDERS; i++) {
     if (i == 0) {
-      strtokIndx1 = strtok(tempChars, ",");
+      strtokIndx2 = strtok(stringLowerLim, ",");
     } else if (strtokIndx1 != NULL) {
-      strtokIndx1 = strtok(NULL, ",");
+      strtokIndx2 = strtok(NULL, ",");  // next token
     }
-    integerFromPC = atoi(strtokIndx1);  // convert this part to an integer
-    cc_upper_limit[i] = integerFromPC;
-    if (cc_upper_limit[i] > 127) {
-      cc_upper_limit[i] = 127;
-    }
+    integerFromPC = atoi(strtokIndx2);  // convert this part to an integer
+    cc_lower_limit[i] = integerFromPC;
   }
-  // End upper limit code
+  // End new lower limit code
+
+  // Start new upper limit code
+  for (int i = 0; i < NUM_SLIDERS; i++) {
+    if (i == 0) {
+      strtokIndx2 = strtok(stringUpperLim, ",");
+    } else if (strtokIndx2 != NULL) {
+      strtokIndx2 = strtok(NULL, ",");  // next token
+    }
+    integerFromPC = atoi(strtokIndx2);  // convert this part to an integer
+    cc_upper_limit[i] = integerFromPC;  //
+  }
+  // End new upper limit code
+
+  //////////
+  //////////
+
+  // char *strtokIndx1;  // CC... / CH...
+  // char *
+  //     strtokIndx2;  // Somehow two pointers is less flash used than a
+  //     single one
+
+  // strtokIndx1 = strtok(tempChars, ":");
+  // // strcpy(stringUpLimit, strtokIndx1);
+  // // strcpy(stringUpLimit, cc_upper_limit);
+
+  // // strtokIndx1 = strtok(NULL, ":");
+  // // strcpy(stringCHAN, strtokIndx1);
+
+  // // Start lower limit saving
+  // // for (int i = 0; i < NUM_SLIDERS; i++) {
+  // //   if (i == 0) {
+  // //     strtokIndx1 = strtok(tempChars, ",");
+  // //   } else if (strtokIndx1 != NULL) {
+  // //     strtokIndx1 = strtok(NULL, ",");
+  // //   }
+  // //   integerFromPC = atoi(strtokIndx1);  // convert this part to an
+  // integer
+  // //   cc_upper_limit[i] = integerFromPC;
+  // //   if (cc_upper_limit[i] > 127) {
+  // //     cc_upper_limit[i] = 127;
+  // //   }
+  // // }
+  // // // End lower limit code
+
+  // // Start upper limit saving
+  // for (int i = 0; i < NUM_SLIDERS; i++) {
+  //   if (i == 0) {
+  //     strtokIndx2 = strtok(tempChars, ",");
+  //   } else if (strtokIndx2 != NULL) {
+  //     strtokIndx2 = strtok(NULL, ",");
+  //   }
+  //   integerFromPC = atoi(strtokIndx2);  // convert this part to an integer
+  //   cc_upper_limit[i] = integerFromPC;
+  //   if (cc_upper_limit[i] > 127) {
+  //     cc_upper_limit[i] = 127;
+  //   }
+  // }
+  // // End upper limit code
 
   // stringCHAN[NUM_SLIDERS * 3] = '\0';  // NULL terminate
 
@@ -374,8 +442,8 @@ void parseUpperLimit() {
   //     } else if (strtokIndx2 != NULL) {
   //       strtokIndx2 = strtok(NULL, ",");
   //     }
-  //     integerFromPC = atoi(strtokIndx2);  // convert this part to an integer
-  //     midi_channel[i] = integerFromPC;
+  //     integerFromPC = atoi(strtokIndx2);  // convert this part to an
+  //     integer midi_channel[i] = integerFromPC;
   //   }  // End Channel code
 }
 
@@ -402,6 +470,8 @@ void printSettings() {
 void printLimitSettings() {
   CompositeSerial.println("MIDI limits");
   CompositeSerial.print("<");
+  printArray(cc_lower_limit, NUM_SLIDERS);
+  CompositeSerial.print(":");
   printArray(cc_upper_limit, NUM_SLIDERS);
   CompositeSerial.print(">");
   CompositeSerial.print('\n');  // newline
@@ -410,8 +480,8 @@ void printLimitSettings() {
 void filteredAnalog() {
   for (int i = 0; i < NUM_SLIDERS; i++) {
     new_value[i] = analogSliderValues[i];  // 12-bit
-    // If difference between new_value and old_value is greater than threshold,
-    // then send new values
+    // If difference between new_value and old_value is greater than
+    // threshold, then send new values
     if ((new_value[i] > old_value[i] &&
          new_value[i] - old_value[i] > threshold) ||
         (new_value[i] < old_value[i] &&
@@ -425,8 +495,9 @@ void filteredAnalog() {
       }
       // Send MIDI
       // channel starts at 0, but midi_channel starts at 1
-      midi.sendControlChange(midi_channel[i] - 1, cc_command[i],
-                             map(new_value[i], 0, 127, 0, cc_upper_limit[i]));
+      midi.sendControlChange(
+          midi_channel[i] - 1, cc_command[i],
+          map(new_value[i], 0, 127, cc_lower_limit[i], cc_upper_limit[i]));
     }
   }
 }
