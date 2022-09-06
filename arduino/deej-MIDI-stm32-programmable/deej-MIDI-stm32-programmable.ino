@@ -35,8 +35,6 @@ char tempChars[MAX_RECEIVE_LENGTH];  // temporary array for use when parsing
 // variables to hold the parsed data
 char messageFromPC[MAX_RECEIVE_LENGTH] = {0};
 int integerFromPC = 0;
-char stringCC[MAX_RECEIVE_LENGTH / 2] = {0};
-char stringCHAN[MAX_RECEIVE_LENGTH / 2] = {0};
 char stringUpLimit[MAX_RECEIVE_LENGTH / 2] = {0};
 
 bool newData = false;
@@ -297,6 +295,9 @@ void recvWithStartEndMarkers() {
 
 void parseData() {
   // split the data into its parts and recombine
+
+  char stringCC[MAX_RECEIVE_LENGTH / 2] = {0};
+  char stringCHAN[MAX_RECEIVE_LENGTH / 2] = {0};
 
   char *strtokIndx1;  // CC... / CH...
   char *
