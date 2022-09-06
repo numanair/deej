@@ -347,8 +347,6 @@ void parseData() {
 void parseFaderLimits() {
   // split the data into its parts and recombine
 
-  //////////
-  //////////
   char stringLowerLim[MAX_RECEIVE_LENGTH / 2] = {0};
   char stringUpperLim[MAX_RECEIVE_LENGTH / 2] = {0};
 
@@ -386,65 +384,6 @@ void parseFaderLimits() {
     cc_upper_limit[i] = integerFromPC;  //
   }
   // End new upper limit code
-
-  //////////
-  //////////
-
-  // char *strtokIndx1;  // CC... / CH...
-  // char *
-  //     strtokIndx2;  // Somehow two pointers is less flash used than a
-  //     single one
-
-  // strtokIndx1 = strtok(tempChars, ":");
-  // // strcpy(stringUpLimit, strtokIndx1);
-  // // strcpy(stringUpLimit, cc_upper_limit);
-
-  // // strtokIndx1 = strtok(NULL, ":");
-  // // strcpy(stringCHAN, strtokIndx1);
-
-  // // Start lower limit saving
-  // // for (int i = 0; i < NUM_SLIDERS; i++) {
-  // //   if (i == 0) {
-  // //     strtokIndx1 = strtok(tempChars, ",");
-  // //   } else if (strtokIndx1 != NULL) {
-  // //     strtokIndx1 = strtok(NULL, ",");
-  // //   }
-  // //   integerFromPC = atoi(strtokIndx1);  // convert this part to an
-  // integer
-  // //   cc_upper_limit[i] = integerFromPC;
-  // //   if (cc_upper_limit[i] > 127) {
-  // //     cc_upper_limit[i] = 127;
-  // //   }
-  // // }
-  // // // End lower limit code
-
-  // // Start upper limit saving
-  // for (int i = 0; i < NUM_SLIDERS; i++) {
-  //   if (i == 0) {
-  //     strtokIndx2 = strtok(tempChars, ",");
-  //   } else if (strtokIndx2 != NULL) {
-  //     strtokIndx2 = strtok(NULL, ",");
-  //   }
-  //   integerFromPC = atoi(strtokIndx2);  // convert this part to an integer
-  //   cc_upper_limit[i] = integerFromPC;
-  //   if (cc_upper_limit[i] > 127) {
-  //     cc_upper_limit[i] = 127;
-  //   }
-  // }
-  // // End upper limit code
-
-  // stringCHAN[NUM_SLIDERS * 3] = '\0';  // NULL terminate
-
-  //   // Start Channel code
-  //   for (int i = 0; i < NUM_SLIDERS; i++) {
-  //     if (i == 0) {
-  //       strtokIndx2 = strtok(stringCHAN, ",");
-  //     } else if (strtokIndx2 != NULL) {
-  //       strtokIndx2 = strtok(NULL, ",");
-  //     }
-  //     integerFromPC = atoi(strtokIndx2);  // convert this part to an
-  //     integer midi_channel[i] = integerFromPC;
-  //   }  // End Channel code
 }
 
 void printArray(byte inputArray[], int arraySize) {
