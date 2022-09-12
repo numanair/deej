@@ -13,7 +13,7 @@ If you have a 1st edition mixer (shipped before May 20th, 2022), please refer to
 ### v1.1.0
 
 - Add user defined min/max limits to fader outputs. Toggle modes with `m`
-- Add help menu accesible from `h`
+- Add help menu accessible from `h`
 
 ### v1.0.0
 
@@ -74,10 +74,12 @@ If you are satisfied with the new settings you may close the serial terminal (Co
 
 ### Output Limits Assignment
 
-New in version 1.1.0 is the ability to set min/max limits for each fader's output. To switch to limits assignment mode, use `m`. If you are already in Limits Mode `m` will switch back to CC/channel assignment mode. Setting limits works like setting CC's. The format is <lower_limit:upper_limit>.
-For example, the default full range of MIDI output is:  
+New in version 1.1.0 is the ability to set min/max limits for each fader's output. Switch to limits assignment mode with `m`. If you are already in Limits Mode `m` will switch back to CC/channel assignment mode. Setting limits works like setting CC's. The format is <lower_limit:upper_limit>.
+For example, the default full-range MIDI output is:  
+
 ```bat
 <0,0,0,0,0:127,127,127,127,127>
-```  
+
+
 Each output can also be reversed by swapping the minimum and maximum values.  
 To check the current settings, send `c` while in Limits Assignment Mode.
