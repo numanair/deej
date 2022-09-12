@@ -422,11 +422,13 @@ void filteredAnalog() {
   for (int i = 0; i < NUM_SLIDERS; i++) {
     new_value[i] = analogSliderValues[i];  // 12-bit
     // If difference between new_value and old_value is greater than
-    // threshold, then send new values
-    if ((new_value[i] > old_value[i] &&
-         new_value[i] - old_value[i] > threshold) ||
-        (new_value[i] < old_value[i] &&
-         old_value[i] - new_value[i] > threshold)) {
+    // threshold, or if it is at the endpoints, then send new values
+    if ((new_value[i] != old_value[i] &&
+         abs(new_value[i] - old_value[i]) > threshold)
+          // ||
+        // (new_value[i] == cc_lower_limit[i]) ||
+        // (new_value[i] == cc_upper_limit[i])
+        ) {
       // Update old_value
       old_value[i] = new_value[i];
       // convert from 12-bit to 7-bit for MIDI
