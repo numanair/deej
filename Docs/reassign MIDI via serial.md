@@ -10,12 +10,17 @@ If you have a 1st edition mixer (shipped before May 20th, 2022), please refer to
 
 ## Features / Versions
 
+### v1.1.0
+
+- Add user defined min/max limits to fader outputs. Toggle modes with `m`
+- Add help menu accesible from `h`
+
 ### v1.0.0
 
 - Automatically saves MIDI CC and channel settings, even if the mixer is unplugged
 - Check current settings with `c`
 - Check firmware version with `v`
-- Temporarily pause Deej output with `d`
+- Temporarily pause (and resume) Deej output with `d`
 
 ### Legacy
 
@@ -66,3 +71,12 @@ If you want to make a small change, first send the character `c` to retrieve the
 As soon as you send the string, the mixer will report back the new settings in the terminal. After a small delay the settings are saved to the MIX5R Pro.
 
 If you are satisfied with the new settings you may close the serial terminal (CoolTerm). If it asks to save it is safe to click no.
+
+### Output Limits Assignment
+
+New in version 1.1.0 is the ability to set min/max limits for each fader's output. To switch to limits assignment mode, use `m`. If you are already in Limits Mode `m` will switch back to CC/channel assignment mode. Setting limits works like setting CC's. The format is <lower_limit:upper_limit>.
+For example, the default full range of MIDI output is:  
+```bat
+<0,0,0,0,0:127,127,127,127,127>
+```  
+Each output can also be reversed by swapping the minimum and maximum values.
