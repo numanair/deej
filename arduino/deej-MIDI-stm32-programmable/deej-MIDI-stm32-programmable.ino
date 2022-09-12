@@ -315,8 +315,8 @@ void recvWithStartEndMarkers() {
       CompositeSerial.println(
           "and correspond to <CC:Channel> or <lower_limit:upper_limit> ");
       CompositeSerial.println("depending on the mode.");
-      CompositeSerial.println("The default limits are 0-127 and ");
-      CompositeSerial.println("can be swapped to reverse the output.");
+      CompositeSerial.println("The default limits are 0-127 and can ");
+      CompositeSerial.println("be swapped to reverse the output.");
     }
   }
 }
