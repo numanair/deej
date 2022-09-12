@@ -238,7 +238,8 @@ void recvWithStartEndMarkers() {
   char retSettings = 'c';    // print settings command
   char retVersion = 'v';     // print firmware version
   char togDeej = 'd';        // toggle Deej
-  char togLimitsEdit = 'l';  // toggle adjusting MIDI limits
+  char togLimitsEdit = 'm';  // toggle adjusting output limits min/max
+  char helpMode = 'h';       // help
   char rc;
 
   while (CompositeSerial.available() > 0 && newData == false) {
@@ -284,7 +285,7 @@ void recvWithStartEndMarkers() {
       if (CC_CH_mode) {
         CompositeSerial.println("CC & Channel Assignment Mode");
       } else {
-        CompositeSerial.println("Limits Editing Mode");
+        CompositeSerial.println("Limits Min/Max Assignment Mode");
       }
     }
 
@@ -296,6 +297,26 @@ void recvWithStartEndMarkers() {
         deej = 1;  // re-enable deej serial output
         CompositeSerial.println("Deej enabled.");
       }
+    }
+
+    else if (rc == helpMode) {
+      deej = -1;                    // disable deej
+      CompositeSerial.print('\n');  // newline
+      CompositeSerial.println("MIX5R Pro Help:");
+      CompositeSerial.println("h - This help menu");
+      CompositeSerial.println("v - Print current firmware version");
+      CompositeSerial.println(
+          "m - toggle assigning MIDI CC/Channel or setting output min/max");
+      CompositeSerial.println("c - Print current settings");
+      CompositeSerial.println("d - Toggle Deej serial output");
+      CompositeSerial.print('\n');  // newline
+      CompositeSerial.println(
+          "Settings are assigned in this format: <1,11,7,14,21:1,1,1,1,1>");
+      CompositeSerial.println(
+          "and correspond to <CC:Channel> or <lower_limit:upper_limit> ");
+      CompositeSerial.println("depending on the mode.");
+      CompositeSerial.println("The default limits are 0-127 and ");
+      CompositeSerial.println("can be swapped to reverse the output.");
     }
   }
 }
