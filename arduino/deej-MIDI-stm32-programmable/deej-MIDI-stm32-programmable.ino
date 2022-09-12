@@ -121,8 +121,8 @@ void setup() {
     // theoretical ideal + (measured - theoretical) * multi
   }
   // Excludes min and max from adjustment by correctionMultiplier
-  adjustedinputval[0] = measuredInput[0];                        // min value
-  adjustedinputval[arrayQty - 1] = measuredInput[arrayQty - 1];  // max value
+  adjustedinputval[0] = idealOutputValues[0];  // min value
+  adjustedinputval[arrayQty - 1] = idealOutputValues[arrayQty - 1];
 
   midi.begin();
   CompositeSerial.begin(9600);
@@ -238,7 +238,7 @@ void recvWithStartEndMarkers() {
   char retSettings = 'c';    // print settings command
   char retVersion = 'v';     // print firmware version
   char togDeej = 'd';        // toggle Deej
-  char setUpperLimit = 'u';  // toggle Deej
+  char togLimitsEdit = 'l';  // toggle adjusting MIDI limits
   char rc;
 
   while (CompositeSerial.available() > 0 && newData == false) {
@@ -278,13 +278,13 @@ void recvWithStartEndMarkers() {
       CompositeSerial.println(firmwareVersion);
     }
 
-    else if (rc == setUpperLimit) {
+    else if (rc == togLimitsEdit) {
       // toggles saving CC/CH or setting the limits for max fader output
-      CC_CH_mode = !CC_CH_mode;
+      CC_CH_mode = !CC_CH_mode;  // toggle
       if (CC_CH_mode) {
         CompositeSerial.println("CC & Channel Assignment Mode");
       } else {
-        CompositeSerial.println("Limits Mode");
+        CompositeSerial.println("Limits Editing Mode");
       }
     }
 
@@ -422,13 +422,9 @@ void filteredAnalog() {
   for (int i = 0; i < NUM_SLIDERS; i++) {
     new_value[i] = analogSliderValues[i];  // 12-bit
     // If difference between new_value and old_value is greater than
-    // threshold, or if it is at the endpoints, then send new values
+    // threshold, send new values
     if ((new_value[i] != old_value[i] &&
-         abs(new_value[i] - old_value[i]) > threshold)
-          // ||
-        // (new_value[i] == cc_lower_limit[i]) ||
-        // (new_value[i] == cc_upper_limit[i])
-        ) {
+         abs(new_value[i] - old_value[i]) > threshold)) {
       // Update old_value
       old_value[i] = new_value[i];
       // convert from 12-bit to 7-bit for MIDI
@@ -467,7 +463,15 @@ void updateSliderValues() {
 void sendSliderValues() {
   String builtString = String("");
   for (int i = 0; i < NUM_SLIDERS; i++) {
-    int limitedVal = analogSliderValues[i] / 4;
+    // User set limits = 0-127.
+    int minVal10bit =
+        cc_lower_limit[i] * (1023.0 / 127.0);  // decimals for float math
+    int maxVal10bit =
+        cc_upper_limit[i] * (1023.0 / 127.0);  // decimals for float math
+    // Map Deej output to MIDI limits (7-bit to 10-bit conversion)
+    int limitedVal =
+        map(analogSliderValues[i], idealOutputValues[0],
+            idealOutputValues[arrayQty - 1], minVal10bit, maxVal10bit);
     if (limitedVal > 1023) {
       limitedVal = 1023;
     }
