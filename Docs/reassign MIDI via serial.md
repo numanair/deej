@@ -79,4 +79,5 @@ For example, the default full range of MIDI output is:
 ```bat
 <0,0,0,0,0:127,127,127,127,127>
 ```  
-Each output can also be reversed by swapping the minimum and maximum values.
+Each output can also be reversed by swapping the minimum and maximum values.  
+To check the current settings, send `c` while in Limits Assignment Mode.
