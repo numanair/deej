@@ -74,7 +74,7 @@ If you are satisfied with the new settings you may close the serial terminal (Co
 
 ### Output Limits Assignment
 
-New in version v1.1.0 is the ability to set min/max limits for each fader's output. Switch to limits assignment mode with `m`. If you are already in Limits Mode `m` will switch back to CC/channel assignment mode. Setting limits works like setting CC's. The format is <lower_limit:upper_limit>.
+New in version v1.1.0 is the ability to set min/max limits for each fader's output. Switch to limits assignment mode with `m`. If you are already in Limits Mode, `m` will switch back to CC/channel assignment mode. Setting limits works like setting CC's. The format is <lower_limit:upper_limit>.
 For example, the default full-range MIDI output is:  
 
 ```bat
