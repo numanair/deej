@@ -2,6 +2,7 @@
 #include <EEPROM.h>
 #include <STM32ADC.h>
 #include <USBComposite.h>
+#include <Wire.h>
 #include <neotimer.h>
 
 #include "MultiMap.h"
@@ -14,23 +15,29 @@
 // https://www.midi.org/specifications-old/item/table-3-control-change-messages-data-bytes-2
 // https://anotherproducer.com/online-tools-for-musicians/midi-cc-list/
 
-const String firmwareVersion = "v1.1.0";
+const String firmwareVersion = "v1.1.0-i2c_m-dev";
 
 // Number of potentiometers or faders
-const uint8_t NUM_SLIDERS = 5;
+const uint8_t NUM_SLIDERS = 8;      // Faders connected to primary board
+const uint8_t NUM_AUX_SLIDERS = 1;  //  Faders on secondary I2C board
+const uint8_t NUM_TOTAL_SLIDERS =
+    NUM_AUX_SLIDERS + NUM_SLIDERS;  //  Total faders count
 
 // Potentiometer pins assignment
-const uint8_t analogInputs[NUM_SLIDERS] = {0, 1, 2, 3, 4};
+const uint8_t analogInputs[NUM_SLIDERS] = {0, 1, 2, 3, 4, 5, 6, 7};
 
-uint8_t midi_channel[NUM_SLIDERS] = {1, 1, 1, 1, 1};   // 1 through 16
-uint8_t cc_command[NUM_SLIDERS] = {1, 11, 7, 14, 21};  // MIDI CC number
+uint8_t midi_channel[NUM_TOTAL_SLIDERS] = {1, 1, 1, 1,
+                                           1, 1, 1, 1};  // 1 through 16
+uint8_t cc_command[NUM_TOTAL_SLIDERS] = {1, 11, 7, 14, 21,
+                                         2, 3,  4, 5};  // MIDI CC number
 
-uint8_t cc_lower_limit[NUM_SLIDERS] = {
-    0, 0, 0, 0, 0};  // optionally limit range of MIDI CC per fader
-uint8_t cc_upper_limit[NUM_SLIDERS] = {
-    127, 127, 127, 127, 127};  // optionally limit range of MIDI CC per fader
+uint8_t cc_lower_limit[NUM_TOTAL_SLIDERS] = {
+    0, 0, 0, 0, 0, 0, 0, 0};  // optionally limit range of MIDI CC per fader
+uint8_t cc_upper_limit[NUM_TOTAL_SLIDERS] = {
+    127, 127, 127, 127, 127,
+    127, 127, 127, 127};  // optionally limit range of MIDI CC per fader
 
-const byte MAX_RECEIVE_LENGTH = (NUM_SLIDERS * 3 - 1) * 2 + 1 + 6;
+const byte MAX_RECEIVE_LENGTH = (NUM_TOTAL_SLIDERS * 3 - 1) * 2 + 1 + 6;
 char receivedChars[MAX_RECEIVE_LENGTH];
 char tempChars[MAX_RECEIVE_LENGTH];  // temporary array for use when parsing
 
@@ -60,19 +67,19 @@ uint16_t idealOutputValues[arrayQty] = {
 // Note: 4095 = 2^12 - 1 (the maximum value that can be represented by
 // a 12-bit unsigned number
 
-int old_value[NUM_SLIDERS] = {0};
-int new_value[NUM_SLIDERS] = {0};
-int old_midi_value[NUM_SLIDERS] = {0};
-int new_midi_value[NUM_SLIDERS] = {0};
-int analogSliderValues[NUM_SLIDERS];
-const int MAX_MESSAGE_LENGTH = NUM_SLIDERS * 6;  // sliders * 00:00,
+int old_value[NUM_TOTAL_SLIDERS] = {0};
+int new_value[NUM_TOTAL_SLIDERS] = {0};
+int old_midi_value[NUM_TOTAL_SLIDERS] = {0};
+int new_midi_value[NUM_TOTAL_SLIDERS] = {0};
+int analogSliderValues[NUM_TOTAL_SLIDERS];
+const int MAX_MESSAGE_LENGTH = NUM_TOTAL_SLIDERS * 6;  // sliders * 00:00,
 bool prog_end = 0;
 bool CC_CH_mode = 1;
 int deej = 1;  // 1=enabled 0=paused -1=disabled
 int addressWriteCC = 20;
-int addressWriteChan = addressWriteCC + NUM_SLIDERS;
-int addressWriteUpperLimit = addressWriteChan + NUM_SLIDERS;
-int addressWriteLowerLimit = addressWriteUpperLimit + NUM_SLIDERS;
+int addressWriteChan = addressWriteCC + NUM_TOTAL_SLIDERS;
+int addressWriteUpperLimit = addressWriteChan + NUM_TOTAL_SLIDERS;
+int addressWriteLowerLimit = addressWriteUpperLimit + NUM_TOTAL_SLIDERS;
 
 Neotimer mytimer = Neotimer(10);  // ms ADC polling interval
 Neotimer mytimer2 = Neotimer(2000);
@@ -103,6 +110,8 @@ void setup() {
   mytimer2.start();
 
   myADC.calibrate();
+
+  // Wire.begin(address);
 
   USBComposite.clear();  // clear any plugins previously registered
   CompositeSerial.registerComponent();
@@ -310,8 +319,8 @@ void recvWithStartEndMarkers() {
       CompositeSerial.println("c - Print current settings");
       CompositeSerial.println("d - Toggle Deej serial output");
       CompositeSerial.print('\n');  // newline
-      CompositeSerial.println(
-          "Settings are assigned in this format: <1,11,7,14,21:1,1,1,1,1>");
+      CompositeSerial.println("Settings are assigned in this format:");
+      CompositeSerial.println("<1,11,7,14,21,2,3,4,5:1,1,1,1,1,1,1,1,1>");
       CompositeSerial.println(
           "and correspond to <CC:Channel> or <lower_limit:upper_limit> ");
       CompositeSerial.println("depending on the mode.");
@@ -321,7 +330,7 @@ void recvWithStartEndMarkers() {
   }
 }
 
-// <CC,CC,CC,CC,CC:CH,CH,CH,CH,CH>
+// <CC,CC,CC,CC,CC,CC,CC,CC,CC:CH,CH,CH,CH,CH,CH,CH,CH,CH>
 // <07,14,14,14,14>:01,01,01,01,01>
 
 void parseData() {
