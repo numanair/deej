@@ -41,12 +41,6 @@ const byte MAX_RECEIVE_LENGTH = (NUM_TOTAL_SLIDERS * 3 - 1) * 2 + 1 + 6;
 char receivedChars[MAX_RECEIVE_LENGTH];
 char tempChars[MAX_RECEIVE_LENGTH];  // temporary array for use when parsing
 
-// variables to hold the parsed data
-char messageFromPC[MAX_RECEIVE_LENGTH] = {0};
-int integerFromPC = 0;
-
-bool newData = false;
-
 // Adjusts linearity correction for my specific potentiometers.
 // 1 = fully linear but jittery. 0.7 is about max for no jitter.
 const float correctionMultiplier = 0.60;
@@ -67,19 +61,24 @@ uint16_t idealOutputValues[arrayQty] = {
 // Note: 4095 = 2^12 - 1 (the maximum value that can be represented by
 // a 12-bit unsigned number
 
+int deej = 1;  // 1=enabled 0=paused -1=disabled
 int old_value[NUM_TOTAL_SLIDERS] = {0};
 int new_value[NUM_TOTAL_SLIDERS] = {0};
 int old_midi_value[NUM_TOTAL_SLIDERS] = {0};
 int new_midi_value[NUM_TOTAL_SLIDERS] = {0};
 int analogSliderValues[NUM_TOTAL_SLIDERS];
-const int MAX_MESSAGE_LENGTH = NUM_TOTAL_SLIDERS * 6;  // sliders * 00:00,
 bool prog_end = 0;
 bool CC_CH_mode = 1;
-int deej = 1;  // 1=enabled 0=paused -1=disabled
+const int MAX_MESSAGE_LENGTH = NUM_TOTAL_SLIDERS * 6;  // sliders * 00:00,
 int addressWriteCC = 20;
 int addressWriteChan = addressWriteCC + NUM_TOTAL_SLIDERS;
 int addressWriteUpperLimit = addressWriteChan + NUM_TOTAL_SLIDERS;
 int addressWriteLowerLimit = addressWriteUpperLimit + NUM_TOTAL_SLIDERS;
+
+// variables to hold the parsed data
+char messageFromPC[MAX_RECEIVE_LENGTH] = {0};
+int integerFromPC = 0;
+bool newData = false;
 
 Neotimer mytimer = Neotimer(10);  // ms ADC polling interval
 Neotimer mytimer2 = Neotimer(2000);
@@ -431,9 +430,9 @@ void printArray(byte inputArray[], int arraySize) {
 void printSettings() {
   CompositeSerial.println("MIDI assignment");
   CompositeSerial.print("<");
-  printArray(cc_command, NUM_SLIDERS);
+  printArray(cc_command, NUM_TOTAL_SLIDERS);
   CompositeSerial.print(":");
-  printArray(midi_channel, NUM_SLIDERS);
+  printArray(midi_channel, NUM_TOTAL_SLIDERS);
   CompositeSerial.print(">");
   CompositeSerial.print('\n');  // newline
 }
@@ -441,15 +440,15 @@ void printSettings() {
 void printLimitSettings() {
   CompositeSerial.println("MIDI limits");
   CompositeSerial.print("<");
-  printArray(cc_lower_limit, NUM_SLIDERS);
+  printArray(cc_lower_limit, NUM_TOTAL_SLIDERS);
   CompositeSerial.print(":");
-  printArray(cc_upper_limit, NUM_SLIDERS);
+  printArray(cc_upper_limit, NUM_TOTAL_SLIDERS);
   CompositeSerial.print(">");
   CompositeSerial.print('\n');  // newline
 }
 
 void filteredAnalog() {
-  for (int i = 0; i < NUM_SLIDERS; i++) {
+  for (int i = 0; i < NUM_TOTAL_SLIDERS; i++) {
     new_value[i] = analogSliderValues[i];  // 12-bit
     // If difference between new_value and old_value is greater than
     // threshold, send new values
@@ -480,9 +479,15 @@ void filteredAnalog() {
   }
 }
 
+// Called every 10ms
 void updateSliderValues() {
-  for (int i = 0; i < NUM_SLIDERS; i++) {
-    // analogSliderValues[i] = analogRead(analogInputs[i]);
+  // Aux faders
+  for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
+    // function to receive data here?
+    // analogSliderValues[i] = x; // Aux fader data from I2C read
+  }
+  // Local faders
+  for (int i = NUM_AUX_SLIDERS; i < NUM_TOTAL_SLIDERS; i++) {
     analogSliderValues[i] =
         multiMap<uint16>(analogRead(analogInputs[i]), adjustedinputval,
                          idealOutputValues, arrayQty);
@@ -492,7 +497,7 @@ void updateSliderValues() {
 // Deej Serial Support
 void sendSliderValues() {
   String builtString = String("");
-  for (int i = 0; i < NUM_SLIDERS; i++) {
+  for (int i = 0; i < NUM_TOTAL_SLIDERS; i++) {
     // User set limits = 0-127.
     int minVal10bit =
         cc_lower_limit[i] * (1023.0 / 127.0);  // decimals for float math
@@ -506,7 +511,7 @@ void sendSliderValues() {
       limitedVal = 1023;
     }
     builtString += String((int)limitedVal);
-    if (i < NUM_SLIDERS - 1) {
+    if (i < NUM_TOTAL_SLIDERS - 1) {
       builtString += String("|");
     }
   }
