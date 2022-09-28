@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <EEPROM.h>
+#include <EasyTransferI2C.h>
 #include <STM32ADC.h>
 #include <USBComposite.h>
 #include <Wire.h>
@@ -45,6 +46,10 @@ char tempChars[MAX_RECEIVE_LENGTH];  // temporary array for use when parsing
 // 1 = fully linear but jittery. 0.7 is about max for no jitter.
 const float correctionMultiplier = 0.60;
 const uint8_t threshold = 32;  // 32ish
+
+// i2c
+const byte mainboard_address = 2;
+uint16_t auxVal[NUM_AUX_SLIDERS] = {0};
 
 // measured output every equal 5mm increment in 12-bit. Minimum and maximum
 // values are not affected by correctionMultiplier.
@@ -110,7 +115,7 @@ void setup() {
 
   myADC.calibrate();
 
-  // Wire.begin(address);
+  Wire.begin(mainboard_address);
 
   USBComposite.clear();  // clear any plugins previously registered
   CompositeSerial.registerComponent();
@@ -481,16 +486,24 @@ void filteredAnalog() {
 
 // Called every 10ms
 void updateSliderValues() {
-  // Aux faders
+  // Aux faders (i2c)
   for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
-    // function to receive data here?
-    // analogSliderValues[i] = x; // Aux fader data from I2C read
+    analogSliderValues[i] = auxVal[i];  // Aux fader data from I2C read
   }
-  // Local faders
+  // Mainboard faders (local)
   for (int i = NUM_AUX_SLIDERS; i < NUM_TOTAL_SLIDERS; i++) {
     analogSliderValues[i] =
         multiMap<uint16>(analogRead(analogInputs[i]), adjustedinputval,
                          idealOutputValues, arrayQty);
+  }
+}
+
+void aux_received(int howMany) {
+  // Aux faders (i2c)
+  // function to receive data here
+  while (Wire.available()) {
+    // auxVal = Wire.read();
+    Wire.readBytes((uint8_t *)&buf, 2);
   }
 }
 
