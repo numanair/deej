@@ -47,10 +47,6 @@ char tempChars[MAX_RECEIVE_LENGTH];  // temporary array for use when parsing
 const float correctionMultiplier = 0.60;
 const uint8_t threshold = 32;  // 32ish
 
-// i2c
-const byte mainboard_address = 2;
-uint16_t auxVal[NUM_AUX_SLIDERS] = {0};
-
 // measured output every equal 5mm increment in 12-bit. Minimum and maximum
 // values are not affected by correctionMultiplier.
 const uint16_t measuredInput[] = {19,   50,   165,  413,  907,  1450, 1975,
@@ -85,6 +81,14 @@ char messageFromPC[MAX_RECEIVE_LENGTH] = {0};
 int integerFromPC = 0;
 bool newData = false;
 
+// i2c
+const byte mainboard_address = 2;
+struct SEND_DATA_STRUCTURE {
+  uint16_t auxVal[NUM_AUX_SLIDERS] = {0};
+};
+SEND_DATA_STRUCTURE mydata;
+EasyTransferI2C ET;  // EasyTransfer object
+
 Neotimer mytimer = Neotimer(10);  // ms ADC polling interval
 Neotimer mytimer2 = Neotimer(2000);
 // ms delay before saving settings/resuming Deej output.
@@ -103,6 +107,7 @@ void printSettings();
 void printLimitSettings();
 void writeToEEPROM();
 void readFromEEPROM();
+void auxData();
 
 STM32ADC myADC(ADC1);
 
@@ -116,6 +121,8 @@ void setup() {
   myADC.calibrate();
 
   Wire.begin(mainboard_address);
+  ET.begin(details(mydata), &Wire);
+  // Wire.onReceive(receive);
 
   USBComposite.clear();  // clear any plugins previously registered
   CompositeSerial.registerComponent();
@@ -487,9 +494,10 @@ void filteredAnalog() {
 // Called every 10ms
 void updateSliderValues() {
   // Aux faders (i2c)
-  for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
-    analogSliderValues[i] = auxVal[i];  // Aux fader data from I2C read
-  }
+  // for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
+  //   analogSliderValues[i] = auxVal[i];  // Aux fader data from I2C read
+  // }
+  auxData();
   // Mainboard faders (local)
   for (int i = NUM_AUX_SLIDERS; i < NUM_TOTAL_SLIDERS; i++) {
     analogSliderValues[i] =
@@ -498,12 +506,12 @@ void updateSliderValues() {
   }
 }
 
-void aux_received(int howMany) {
+void auxData() {
   // Aux faders (i2c)
-  // function to receive data here
-  while (Wire.available()) {
-    // auxVal = Wire.read();
-    Wire.readBytes((uint8_t *)&buf, 2);
+  if (ET.receiveData()) {
+    for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
+      analogSliderValues[i] = mydata.auxVal[i];  // Aux fader data from I2C read
+    }
   }
 }
 

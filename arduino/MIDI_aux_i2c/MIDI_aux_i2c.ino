@@ -20,12 +20,14 @@ const uint8_t analogInputs[NUM_AUX_SLIDERS] = {0};
 
 const byte mainboard_address = 2;
 
-uint16_t auxVal[NUM_AUX_SLIDERS] = {0};
-
 Neotimer mytimer = Neotimer(3);
 
 EasyTransferI2C ET;  // EasyTransfer object
 //  https://github.com/eugene-prout/Arduino-EasyTransfer/
+struct SEND_DATA_STRUCTURE {
+  uint16_t auxVal[NUM_AUX_SLIDERS] = {0};
+};
+SEND_DATA_STRUCTURE mydata;
 
 STM32ADC myADC(ADC1);
 
@@ -40,6 +42,7 @@ void setup() {
   myADC.calibrate();
 
   Wire.begin();
+  ET.begin(details(mydata), &Wire);
 
   delay(100);
 }
@@ -56,10 +59,8 @@ void updateSliderValues() {
   // Aux faders (local)
   for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
     // Read ADC fader value
-    auxVal[i] = analogRead(analogInputs[i]);
+    mydata.auxVal[i] = analogRead(analogInputs[i]);
   }
-  // function to send data
-  Wire.beginTransmission(mainboard_address);
-  Wire.write(auxVal, NUM_AUX_SLIDERS);
-  int returnMsg = Wire.endTransmission(0);
+  // send data
+  ET.sendData(mainboard_address);
 }
