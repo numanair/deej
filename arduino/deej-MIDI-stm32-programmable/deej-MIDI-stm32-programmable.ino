@@ -1,9 +1,9 @@
 #include <Arduino.h>
 #include <EEPROM.h>
+#include <Wire_slave.h>  // make sure this is before EasyTransfer
 #include <EasyTransferI2C.h>
 #include <STM32ADC.h>
 #include <USBComposite.h>
-#include <Wire.h>
 #include <neotimer.h>
 
 #include "MultiMap.h"
@@ -27,7 +27,7 @@ const uint8_t NUM_TOTAL_SLIDERS =
 // Potentiometer pins assignment
 const uint8_t analogInputs[NUM_SLIDERS] = {0, 1, 2, 3, 4, 5, 6, 7};
 
-uint8_t midi_channel[NUM_TOTAL_SLIDERS] = {1, 1, 1, 1,
+uint8_t midi_channel[NUM_TOTAL_SLIDERS] = {1, 1, 1, 1, 1,
                                            1, 1, 1, 1};  // 1 through 16
 uint8_t cc_command[NUM_TOTAL_SLIDERS] = {1, 11, 7, 14, 21,
                                          2, 3,  4, 5};  // MIDI CC number
@@ -38,7 +38,7 @@ uint8_t cc_upper_limit[NUM_TOTAL_SLIDERS] = {
     127, 127, 127, 127, 127,
     127, 127, 127, 127};  // optionally limit range of MIDI CC per fader
 
-const byte MAX_RECEIVE_LENGTH = (NUM_TOTAL_SLIDERS * 3 - 1) * 2 + 1 + 6;
+const byte MAX_RECEIVE_LENGTH = (NUM_TOTAL_SLIDERS * 4 - 1) * 2 + 1 + 6;
 char receivedChars[MAX_RECEIVE_LENGTH];
 char tempChars[MAX_RECEIVE_LENGTH];  // temporary array for use when parsing
 
@@ -71,7 +71,7 @@ int analogSliderValues[NUM_TOTAL_SLIDERS];
 bool prog_end = 0;
 bool CC_CH_mode = 1;
 const int MAX_MESSAGE_LENGTH = NUM_TOTAL_SLIDERS * 6;  // sliders * 00:00,
-int addressWriteCC = 20;
+int addressWriteCC = 2;
 int addressWriteChan = addressWriteCC + NUM_TOTAL_SLIDERS;
 int addressWriteUpperLimit = addressWriteChan + NUM_TOTAL_SLIDERS;
 int addressWriteLowerLimit = addressWriteUpperLimit + NUM_TOTAL_SLIDERS;
@@ -82,12 +82,12 @@ int integerFromPC = 0;
 bool newData = false;
 
 // i2c
+EasyTransferI2C ET;  // EasyTransfer object
 const byte mainboard_address = 2;
-struct SEND_DATA_STRUCTURE {
+struct RECEIVE_DATA_STRUCTURE {
   uint16_t auxVal[NUM_AUX_SLIDERS] = {0};
 };
-SEND_DATA_STRUCTURE mydata;
-EasyTransferI2C ET;  // EasyTransfer object
+RECEIVE_DATA_STRUCTURE mydata;
 
 Neotimer mytimer = Neotimer(10);  // ms ADC polling interval
 Neotimer mytimer2 = Neotimer(2000);
@@ -107,7 +107,7 @@ void printSettings();
 void printLimitSettings();
 void writeToEEPROM();
 void readFromEEPROM();
-void auxData();
+void receiveFunc();
 
 STM32ADC myADC(ADC1);
 
@@ -122,7 +122,7 @@ void setup() {
 
   Wire.begin(mainboard_address);
   ET.begin(details(mydata), &Wire);
-  // Wire.onReceive(receive);
+  Wire.onReceive(receiveFunc);
 
   USBComposite.clear();  // clear any plugins previously registered
   CompositeSerial.registerComponent();
@@ -417,7 +417,7 @@ void parseFaderLimits() {
   // End new lower limit code
 
   // Start new upper limit code
-  for (int i = 0; i < NUM_SLIDERS; i++) {
+  for (int i = 0; i < NUM_TOTAL_SLIDERS; i++) {
     if (i == 0) {
       strtokIndx2 = strtok(stringUpperLim, ",");
     } else if (strtokIndx2 != NULL) {
@@ -497,21 +497,20 @@ void updateSliderValues() {
   // for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
   //   analogSliderValues[i] = auxVal[i];  // Aux fader data from I2C read
   // }
-  auxData();
+
+  if (ET.receiveData()) {
+    for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
+      analogSliderValues[i] = multiMap<uint16>(
+          mydata.auxVal[i], adjustedinputval, idealOutputValues,
+          arrayQty);  //  Aux fader data from I2C
+    }
+    // analogSliderValues[0] = 255;
+  }
   // Mainboard faders (local)
   for (int i = NUM_AUX_SLIDERS; i < NUM_TOTAL_SLIDERS; i++) {
     analogSliderValues[i] =
         multiMap<uint16>(analogRead(analogInputs[i]), adjustedinputval,
                          idealOutputValues, arrayQty);
-  }
-}
-
-void auxData() {
-  // Aux faders (i2c)
-  if (ET.receiveData()) {
-    for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
-      analogSliderValues[i] = mydata.auxVal[i];  // Aux fader data from I2C read
-    }
   }
 }
 
@@ -537,4 +536,9 @@ void sendSliderValues() {
     }
   }
   CompositeSerial.println(builtString);
+  // for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
+  //   CompositeSerial.println(mydata.auxVal[i]);
+  // }
 }
+
+void receiveFunc(int numBytes) {}
