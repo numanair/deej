@@ -1,10 +1,11 @@
 #include <Arduino.h>
 #include <EasyTransferI2C.h>
-#include <STM32ADC.h>
+// #include <STM32ADC.h>
 #include <Wire.h>
 #include <neotimer.h>
 
 #include "MultiMap.h"
+#include "lgtx8p.h"
 
 // AXILLARY (secondary) board firmware
 const String firmwareVersion = "v1.1.0-i2c_a-dev";
@@ -20,7 +21,7 @@ const uint8_t analogInputs[NUM_AUX_SLIDERS] = {0};
 
 const byte mainboard_address = 2;
 
-Neotimer mytimer = Neotimer(3);
+//Neotimer mytimer = Neotimer(3);
 
 EasyTransferI2C ET;  // EasyTransfer object
 //  https://github.com/eugene-prout/Arduino-EasyTransfer/
@@ -29,29 +30,30 @@ struct SEND_DATA_STRUCTURE {
 };
 SEND_DATA_STRUCTURE mydata;
 
-STM32ADC myADC(ADC1);
+// STM32ADC myADC(ADC1);
 
 void updateSliderValues();
 
 void setup() {
   for (int i = 0; i < NUM_SLIDERS; i++) {
-    pinMode(analogInputs[i], INPUT_ANALOG);
+    pinMode(analogInputs[i], INPUT);
   }
-  pinMode(PC13, OUTPUT);
+  pinMode(13, OUTPUT);
 
-  myADC.calibrate();
+  // myADC.calibrate();
 
   Wire.begin();
   ET.begin(details(mydata), &Wire);
+
+  Serial.begin(9600);
 
   delay(100);
 }
 
 void loop() {
-  // Deej loop and MIDI values and sending every 10ms
-  if (mytimer.repeat()) {
+//  if (mytimer.repeat()) {
     updateSliderValues();
-  }
+//  }
 }
 
 // Called every 10ms
@@ -60,7 +62,9 @@ void updateSliderValues() {
   for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
     // Read ADC fader value
     mydata.auxVal[i] = analogRead(analogInputs[i]);
+    Serial.println(mydata.auxVal[i]);
   }
   // send data
   ET.sendData(mainboard_address);
+  delay(10);
 }
