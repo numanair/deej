@@ -1,11 +1,11 @@
 #include <Arduino.h>
-#include <EasyTransferI2C.h>
-// #include <STM32ADC.h>
 #include <Wire.h>
+#include <EasyTransferI2C.h>
+#include <STM32ADC.h>  // STM32
 #include <neotimer.h>
 
 #include "MultiMap.h"
-#include "lgtx8p.h"
+// #include "lgtx8p.h" // LGT8F328P
 
 // AXILLARY (secondary) board firmware
 const String firmwareVersion = "v1.1.0-i2c_a-dev";
@@ -17,11 +17,11 @@ const uint8_t NUM_TOTAL_SLIDERS =
     NUM_AUX_SLIDERS + NUM_SLIDERS;  //  Total faders count
 
 // Analog pins assignment
-const uint8_t analogInputs[NUM_AUX_SLIDERS] = {0};
+const uint8_t analogInputs[NUM_AUX_SLIDERS] = {PA0};
 
 const byte mainboard_address = 2;
 
-//Neotimer mytimer = Neotimer(3);
+Neotimer mytimer = Neotimer(5);
 
 EasyTransferI2C ET;  // EasyTransfer object
 //  https://github.com/eugene-prout/Arduino-EasyTransfer/
@@ -30,7 +30,7 @@ struct SEND_DATA_STRUCTURE {
 };
 SEND_DATA_STRUCTURE mydata;
 
-// STM32ADC myADC(ADC1);
+STM32ADC myADC(ADC1);  // STM32
 
 void updateSliderValues();
 
@@ -38,9 +38,9 @@ void setup() {
   for (int i = 0; i < NUM_SLIDERS; i++) {
     pinMode(analogInputs[i], INPUT);
   }
-  pinMode(13, OUTPUT);
+  pinMode(PC13, OUTPUT);
 
-  // myADC.calibrate();
+  myADC.calibrate();  // STM32
 
   Wire.begin();
   ET.begin(details(mydata), &Wire);
@@ -51,20 +51,23 @@ void setup() {
 }
 
 void loop() {
-//  if (mytimer.repeat()) {
-    updateSliderValues();
-//  }
-}
-
-// Called every 10ms
-void updateSliderValues() {
-  // Aux faders (local)
+  int adcRead[NUM_AUX_SLIDERS];
+  for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
+    // adcRead[i] = 500;
+    adcRead[i] = analogRead(analogInputs[i]);
+  }
+  // updateSliderValues();
   for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
     // Read ADC fader value
-    mydata.auxVal[i] = analogRead(analogInputs[i]);
-    Serial.println(mydata.auxVal[i]);
+    mydata.auxVal[i] = adcRead[i];
+    Serial.print(mydata.auxVal[i]);
+    Serial.print(' ');
   }
+  Serial.print('\n');
   // send data
-  ET.sendData(mainboard_address);
-  delay(10);
+  if (mytimer.repeat()) {
+    Serial.println("sending");
+    ET.sendData(mainboard_address);
+    Serial.println("done");
+  }
 }

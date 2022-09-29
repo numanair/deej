@@ -25,7 +25,7 @@ const uint8_t NUM_TOTAL_SLIDERS =
     NUM_AUX_SLIDERS + NUM_SLIDERS;  //  Total faders count
 
 // Potentiometer pins assignment
-const uint8_t analogInputs[NUM_SLIDERS] = {0, 1, 2, 3, 4, 5, 6, 7};
+const uint8_t analogInputs[NUM_SLIDERS] = {PA0, PA1, PA2, PA3, PA4};
 
 uint8_t midi_channel[NUM_TOTAL_SLIDERS] = {1, 1, 1, 1, 1,
                                            1, 1, 1, 1};  // 1 through 16
@@ -70,7 +70,7 @@ int new_midi_value[NUM_TOTAL_SLIDERS] = {0};
 int analogSliderValues[NUM_TOTAL_SLIDERS];
 bool prog_end = 0;
 bool CC_CH_mode = 1;
-const int MAX_MESSAGE_LENGTH = NUM_TOTAL_SLIDERS * 6;  // sliders * 00:00,
+// const int MAX_MESSAGE_LENGTH = NUM_TOTAL_SLIDERS * 6;  // sliders * 00:00,
 int addressWriteCC = 2;
 int addressWriteChan = addressWriteCC + NUM_TOTAL_SLIDERS;
 int addressWriteUpperLimit = addressWriteChan + NUM_TOTAL_SLIDERS;
@@ -89,7 +89,8 @@ struct RECEIVE_DATA_STRUCTURE {
 };
 RECEIVE_DATA_STRUCTURE mydata;
 
-Neotimer mytimer = Neotimer(10);  // ms ADC polling interval
+Neotimer mytimer = Neotimer(2);  // ms ADC polling interval
+Neotimer mytimer2 = Neotimer(2000);
 Neotimer mytimer2 = Neotimer(2000);
 // ms delay before saving settings/resuming Deej output.
 // Also prevents rapid EEPROM writes.
@@ -494,23 +495,18 @@ void filteredAnalog() {
 // Called every 10ms
 void updateSliderValues() {
   // Aux faders (i2c)
-  // for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
-  //   analogSliderValues[i] = auxVal[i];  // Aux fader data from I2C read
-  // }
-
   if (ET.receiveData()) {
     for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
       analogSliderValues[i] = multiMap<uint16>(
           mydata.auxVal[i], adjustedinputval, idealOutputValues,
           arrayQty);  //  Aux fader data from I2C
     }
-    // analogSliderValues[0] = 255;
   }
   // Mainboard faders (local)
   for (int i = NUM_AUX_SLIDERS; i < NUM_TOTAL_SLIDERS; i++) {
     analogSliderValues[i] =
-        multiMap<uint16>(analogRead(analogInputs[i]), adjustedinputval,
-                         idealOutputValues, arrayQty);
+        multiMap<uint16>(analogRead(analogInputs[i - NUM_AUX_SLIDERS]),
+                         adjustedinputval, idealOutputValues, arrayQty);
   }
 }
 
@@ -536,9 +532,6 @@ void sendSliderValues() {
     }
   }
   CompositeSerial.println(builtString);
-  // for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
-  //   CompositeSerial.println(mydata.auxVal[i]);
-  // }
 }
 
 void receiveFunc(int numBytes) {}
