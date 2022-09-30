@@ -17,14 +17,13 @@
 const String firmwareVersion = "v1.1.0-rx-dev";
 
 // Number of potentiometers or faders
-const uint8_t NUM_SLIDERS = 8;      // Faders connected to primary board
-const uint8_t NUM_AUX_SLIDERS = 1;  //  Faders on secondary I2C board
+const uint8_t NUM_SLIDERS = 5;      // Faders connected to primary board
+const uint8_t NUM_AUX_SLIDERS = 4;  //  Faders on secondary I2C board
 const uint8_t NUM_TOTAL_SLIDERS =
     NUM_AUX_SLIDERS + NUM_SLIDERS;  //  Total faders count
 
 // Potentiometer pins assignment
-const uint8_t analogInputs[NUM_SLIDERS] = {PA0, PA1, PA2, PA3,
-                                           PA4, PA5, PA6, PA7};
+const uint8_t analogInputs[NUM_SLIDERS] = {PA0, PA1, PA2, PA3, PA4};
 
 uint8_t midi_channel[NUM_TOTAL_SLIDERS] = {1, 1, 1, 1, 1,
                                            1, 1, 1, 1};  // 1 through 16
@@ -40,6 +39,10 @@ uint8_t cc_upper_limit[NUM_TOTAL_SLIDERS] = {
 const byte MAX_RECEIVE_LENGTH = (NUM_TOTAL_SLIDERS * 4 - 1) * 2 + 1 + 6;
 char receivedChars[MAX_RECEIVE_LENGTH];
 char tempChars[MAX_RECEIVE_LENGTH];  // temporary array for use when parsing
+
+const byte MAX_AUX_LENGTH = NUM_AUX_SLIDERS * 4;
+char receivedCharsAux[MAX_AUX_LENGTH];
+char tempCharsAux[MAX_AUX_LENGTH];  // temporary array for use when parsing
 
 // Adjusts linearity correction for my specific potentiometers.
 // 1 = fully linear but jittery. 0.7 is about max for no jitter.
@@ -78,11 +81,13 @@ int addressWriteLowerLimit = addressWriteUpperLimit + NUM_TOTAL_SLIDERS;
 // variables to hold the parsed data
 char messageFromPC[MAX_RECEIVE_LENGTH] = {0};
 int integerFromPC = 0;
+uint16_t intAux = 0;
 bool newData = false;
+bool newAux = false;
 
 uint16_t auxVal[NUM_AUX_SLIDERS] = {0};
 
-Neotimer mytimer = Neotimer(2);  // ms ADC polling interval
+Neotimer mytimer = Neotimer(10);  // ms ADC polling interval
 Neotimer mytimer2 = Neotimer(2000);
 // ms delay before saving settings/resuming Deej output.
 // Also prevents rapid EEPROM writes.
@@ -95,19 +100,22 @@ void updateSliderValues();
 void filteredAnalog();
 void parseData();
 void recvWithStartEndMarkers();
+void receiveAuxData();
 void printArray();
 void printSettings();
 void printLimitSettings();
 void writeToEEPROM();
 void readFromEEPROM();
-void receiveFunc();
+void parseAux();
 
 STM32ADC myADC(ADC1);
 
 void setup() {
+  // set pinMode only for local faders
   for (int i = 0; i < NUM_SLIDERS; i++) {
     pinMode(analogInputs[i], INPUT_ANALOG);
   }
+  // LED is inverted on these boards
   pinMode(PC13, OUTPUT);
   mytimer2.start();
 
@@ -143,22 +151,24 @@ void setup() {
   if (EEPROM.read(addressFlag) == 200) {
     // EEPROM already set. Reading.
     CompositeSerial.println("EEPROM already set. Reading");
-    readFromEEPROM(addressWriteCC, cc_command, NUM_SLIDERS, 127);     // CC
-    readFromEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS, 16);  // Channel
-    readFromEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_SLIDERS,
+    readFromEEPROM(addressWriteCC, cc_command, NUM_TOTAL_SLIDERS, 127);  // CC
+    readFromEEPROM(addressWriteChan, midi_channel, NUM_TOTAL_SLIDERS,
+                   16);  // Channel
+    readFromEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_TOTAL_SLIDERS,
                    127);  // Lower bound of each fader output
-    readFromEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_SLIDERS,
+    readFromEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_TOTAL_SLIDERS,
                    127);   // Upper bound of each fader output
     printSettings();       // print settings to serial
     printLimitSettings();  // print settings to serial
   } else {
     // First run, set EEPROM data to defaults
     CompositeSerial.println("First run, set EEPROM data to defaults");
-    writeToEEPROM(addressWriteCC, cc_command, NUM_SLIDERS, 127);     // CC
-    writeToEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS, 16);  // Channel
-    writeToEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_SLIDERS,
+    writeToEEPROM(addressWriteCC, cc_command, NUM_TOTAL_SLIDERS, 127);  // CC
+    writeToEEPROM(addressWriteChan, midi_channel, NUM_TOTAL_SLIDERS,
+                  16);  // Channel
+    writeToEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_TOTAL_SLIDERS,
                   127);  // Lower bound of each fader output
-    writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_SLIDERS,
+    writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_TOTAL_SLIDERS,
                   127);              // Upper bound of each fader output
     EEPROM.write(addressFlag, 200);  // mark EEPROM as set
   }
@@ -167,18 +177,23 @@ void setup() {
 }
 
 void loop() {
+  receiveAuxData();
+
   // Deej loop and MIDI values and sending every 10ms
   if (mytimer.repeat()) {
-    updateSliderValues();  // Gets new slider values
-    filteredAnalog();      // MIDI
+    parseAux();            // Puts Aux fader values into an array (auxVal)
+    updateSliderValues();  // Reads fader analog values. Also maps all faders.
+    filteredAnalog();      // MIDI. Checks for changed value before sending.
     if (deej > 0) {
       sendSliderValues();  // Deej Serial
     } else if (mytimer2.done()) {
       if (prog_end) {
-        writeToEEPROM(addressWriteCC, cc_command, NUM_SLIDERS, 127);
-        writeToEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS, 16);
-        writeToEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_SLIDERS, 127);
-        writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_SLIDERS, 127);
+        writeToEEPROM(addressWriteCC, cc_command, NUM_TOTAL_SLIDERS, 127);
+        writeToEEPROM(addressWriteChan, midi_channel, NUM_TOTAL_SLIDERS, 16);
+        writeToEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_TOTAL_SLIDERS,
+                      127);
+        writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_TOTAL_SLIDERS,
+                      127);
         CompositeSerial.println("MIDI settings saved");
         prog_end = 0;
         if (deej > 0) {
@@ -190,6 +205,7 @@ void loop() {
       }
     }
   }
+
   recvWithStartEndMarkers();
   if (newData == true) {
     strcpy(tempChars, receivedChars);
@@ -219,7 +235,7 @@ void loop() {
 }
 
 void writeToEEPROM(int addressRead, byte byteArray[], int arraySize, int max) {
-  for (int i = 0; i < NUM_SLIDERS; ++i) {
+  for (int i = 0; i < NUM_TOTAL_SLIDERS; ++i) {
     if (byteArray[i] > max) {
       // Keeps CC/channel within limit
       byteArray[i] = max;
@@ -230,7 +246,7 @@ void writeToEEPROM(int addressRead, byte byteArray[], int arraySize, int max) {
 }
 
 void readFromEEPROM(int addressRead, byte byteArray[], int arraySize, int max) {
-  for (int i = 0; i < NUM_SLIDERS; ++i) {
+  for (int i = 0; i < NUM_TOTAL_SLIDERS; ++i) {
     byteArray[i] = EEPROM.read(addressRead);
     if (byteArray[i] > max) {
       // Keeps CC/channel within limit
@@ -352,7 +368,7 @@ void parseData() {
   strcpy(stringCHAN, strtokIndx1);
 
   // Start CC code
-  for (int i = 0; i < NUM_SLIDERS; i++) {
+  for (int i = 0; i < NUM_TOTAL_SLIDERS; i++) {
     if (i == 0) {
       strtokIndx2 = strtok(stringCC, ",");
     } else if (strtokIndx1 != NULL) {
@@ -363,10 +379,10 @@ void parseData() {
   }
   // End CC code
 
-  stringCHAN[NUM_SLIDERS * 3] = '\0';  // NULL terminate
+  stringCHAN[NUM_TOTAL_SLIDERS * 3] = '\0';  // NULL terminate
 
   // Start Channel code
-  for (int i = 0; i < NUM_SLIDERS; i++) {
+  for (int i = 0; i < NUM_TOTAL_SLIDERS; i++) {
     if (i == 0) {
       strtokIndx2 = strtok(stringCHAN, ",");
     } else if (strtokIndx2 != NULL) {
@@ -395,7 +411,7 @@ void parseFaderLimits() {
   strcpy(stringUpperLim, strtokIndx1);
 
   // Start new lower limit code
-  for (int i = 0; i < NUM_SLIDERS; i++) {
+  for (int i = 0; i < NUM_TOTAL_SLIDERS; i++) {
     if (i == 0) {
       strtokIndx2 = strtok(stringLowerLim, ",");
     } else if (strtokIndx1 != NULL) {
@@ -481,25 +497,69 @@ void filteredAnalog() {
   }
 }
 
+// Reads Serial1 input for Aux fader values
 void receiveAuxData() {
+  static bool recvAuxInProgress = false;
   char startMarker = '<';
   char endMarker = '>';
+  static byte ndx = 0;
   char rc;
+
+  while (Serial1.available() > 0 && newAux == false) {
+    rc = Serial1.read();
+    // CompositeSerial.print("rc:");  // print rc
+    // CompositeSerial.print(rc);     // print rc
+    // CompositeSerial.print('\n');   // print rc
+    if (recvAuxInProgress == true) {
+      if (rc != endMarker) {
+        // CompositeSerial.println("debugging");  // debugging
+        receivedCharsAux[ndx] = rc;
+        ndx++;
+        if (ndx >= MAX_RECEIVE_LENGTH) {
+          ndx = MAX_RECEIVE_LENGTH - 1;
+        }
+      } else {                         // end marker
+        receivedCharsAux[ndx] = '\0';  // terminate the string
+        recvAuxInProgress = false;
+        ndx = 0;
+        newAux = true;
+      }
+    }
+
+    else if (rc == startMarker) {
+      recvAuxInProgress = true;
+    }
+  }
+}
+
+// Gets Aux fader values and stores them in auxVal array.
+void parseAux() {
+  char stringAux[MAX_AUX_LENGTH];
+  char *strtokIndx1;
+
+  // new parseData for aux:
+  if (newAux == true) {
+    strcpy(stringAux, receivedCharsAux);
+    // this temporary copy is necessary to protect the original data
+    // because strtok() used below replaces the commas with \0
+
+    for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
+      if (i == 0) {
+        strtokIndx1 = strtok(stringAux, ",");
+      } else if (strtokIndx1 != NULL) {
+        strtokIndx1 = strtok(NULL, ",");  // next token
+      }
+      intAux = atoi(strtokIndx1);  // convert this part to an integer
+      auxVal[i] = intAux;
+    }
+
+    newAux = false;
+  }
 }
 
 // Called every 10ms
 void updateSliderValues() {
-  // Aux faders
-  if (Serial1.available() > 0) {
-    CompositeSerial.println("serial rec");
-    uint16_t serialread = Serial1.read();
-    // for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
-    // CompositeSerial.print(auxVal[i]);
-    CompositeSerial.print(serialread);
-    CompositeSerial.print(' ');
-    // }
-    CompositeSerial.print('\n');
-  }
+  // Apply mapping to Aux faders
   for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
     analogSliderValues[i] =
         multiMap<uint16>(auxVal[i], adjustedinputval, idealOutputValues,
@@ -534,7 +594,5 @@ void sendSliderValues() {
       builtString += String("|");
     }
   }
-  // CompositeSerial.println(builtString);
+  CompositeSerial.println(builtString);
 }
-
-void receiveFunc(int numBytes) {}
