@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 #include <STM32ADC.h>
+#include <SerialTransfer.h>  // for SerialTransfer
 #include <USBComposite.h>
 #include <neotimer.h>
 
@@ -13,6 +14,11 @@
 // channel 1-5. CC max is 127 and channel can be 1-16
 // https://www.midi.org/specifications-old/item/table-3-control-change-messages-data-bytes-2
 // https://anotherproducer.com/online-tools-for-musicians/midi-cc-list/
+
+// Libraries:
+// https://github.com/PowerBroker2/SerialTransfer/
+// https://github.com/jrullan/neotimer
+// https://github.com/RobTillaart/MultiMap
 
 const String firmwareVersion = "v1.1.0-rx-dev";
 
@@ -92,6 +98,8 @@ Neotimer mytimer2 = Neotimer(2000);
 // ms delay before saving settings/resuming Deej output.
 // Also prevents rapid EEPROM writes.
 
+SerialTransfer myTransfer;
+
 USBMIDI midi;
 USBCompositeSerial CompositeSerial;
 
@@ -106,7 +114,7 @@ void printSettings();
 void printLimitSettings();
 void writeToEEPROM();
 void readFromEEPROM();
-void parseAux();
+// void parseAux();
 
 STM32ADC myADC(ADC1);
 
@@ -142,10 +150,11 @@ void setup() {
   adjustedinputval[arrayQty - 1] = idealOutputValues[arrayQty - 1];
 
   midi.begin();
-  CompositeSerial.begin(9600);
-  Serial1.begin(9600);
+  CompositeSerial.begin(9600);  // USB
+  Serial1.begin(115200);          // Aux
+  myTransfer.begin(Serial1);
 
-  delay(3000);
+  delay(2000);
   // EEPROM setup:
   const int addressFlag = 10;
   if (EEPROM.read(addressFlag) == 200) {
@@ -173,15 +182,23 @@ void setup() {
     EEPROM.write(addressFlag, 200);  // mark EEPROM as set
   }
 
-  delay(500);
+  delay(800);
 }
 
 void loop() {
-  receiveAuxData();
+  // receiveAuxData();
+  if (myTransfer.available()) {
+    myTransfer.rxObj(auxVal);  // serialTransfer datum (single obj)
+    for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
+      // CompositeSerial.print(auxVal[i]);
+      // CompositeSerial.print(",");
+    }
+    // CompositeSerial.print('\n');
+  }
 
   // Deej loop and MIDI values and sending every 10ms
   if (mytimer.repeat()) {
-    parseAux();            // Puts Aux fader values into an array (auxVal)
+    // parseAux();            // Puts Aux fader values into an array (auxVal)
     updateSliderValues();  // Reads fader analog values. Also maps all faders.
     filteredAnalog();      // MIDI. Checks for changed value before sending.
     if (deej > 0) {
@@ -533,6 +550,7 @@ void receiveAuxData() {
 }
 
 // Gets Aux fader values and stores them in auxVal array.
+/*/
 void parseAux() {
   char stringAux[MAX_AUX_LENGTH];
   char *strtokIndx1;
@@ -556,16 +574,20 @@ void parseAux() {
     newAux = false;
   }
 }
+/*/
 
 // Called every 10ms
 void updateSliderValues() {
-  // Apply mapping to Aux faders
+  // if (myTransfer.status = 0) {
+  // no serial error
+  // Apply mapping to Aux faders (external)
   for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
     analogSliderValues[i] =
         multiMap<uint16>(auxVal[i], adjustedinputval, idealOutputValues,
                          arrayQty);  //  Aux fader data from I2C
   }
-  // Mainboard faders (local)
+  // }
+  // Apply mapping to mainboard faders (local)
   for (int i = NUM_AUX_SLIDERS; i < NUM_TOTAL_SLIDERS; i++) {
     analogSliderValues[i] =
         multiMap<uint16>(analogRead(analogInputs[i - NUM_AUX_SLIDERS]),

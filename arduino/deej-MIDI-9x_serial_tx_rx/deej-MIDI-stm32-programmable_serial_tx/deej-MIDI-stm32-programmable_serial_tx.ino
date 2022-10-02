@@ -1,8 +1,9 @@
 #include <Arduino.h>
-#include <STM32ADC.h>  // STM32
+// #include <Packet.h>          // for SerialTransfer
+// #include <PacketCRC.h>       // for SerialTransfer
+#include <STM32ADC.h>        // STM32
+#include <SerialTransfer.h>  // for SerialTransfer
 #include <neotimer.h>
-
-// #include "MultiMap.h"
 
 // AXILLARY (secondary) board firmware
 const String firmwareVersion = "v1.1.0-tx-dev";
@@ -22,7 +23,9 @@ uint16_t auxVal[NUM_AUX_SLIDERS] = {0};
 
 STM32ADC myADC(ADC1);  // STM32
 
-void updateSliderValues();
+SerialTransfer myTransfer;
+
+void sendSliderValues();
 
 void setup() {
   for (int i = 0; i < NUM_SLIDERS; i++) {
@@ -33,7 +36,8 @@ void setup() {
   myADC.calibrate();
 
   Serial.begin(9600);   // usb serial
-  Serial1.begin(9600);  // UART port 1
+  Serial1.begin(115200);  // UART port 1
+  myTransfer.begin(Serial1);
 
   delay(100);
 }
@@ -41,17 +45,11 @@ void setup() {
 void loop() {
   for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
     auxVal[i] = analogRead(analogInputs[i]);
-    // Serial.print(auxVal[i]);
-    // Serial.print(' ');
   }
-  // Serial.print('\n');
-  delay(1);
+  delay(2);
   // send data
   if (mytimer.repeat()) {
-    // Serial.println("sending");
-    // Serial1.write(auxVal, NUM_AUX_SLIDERS);  // send
     sendSliderValues();  // send
-    // Serial.println("done");
   }
 }
 
@@ -67,5 +65,6 @@ void sendSliderValues() {
     }
   }
   Serial.println(builtString);
-  Serial1.print(builtString);  // send
+  // Serial1.print(builtString);  // send
+  myTransfer.sendDatum(auxVal);  // serialTransfer datum (single obj)
 }
