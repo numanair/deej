@@ -108,13 +108,11 @@ void updateSliderValues();
 void filteredAnalog();
 void parseData();
 void recvWithStartEndMarkers();
-void receiveAuxData();
 void printArray();
 void printSettings();
 void printLimitSettings();
 void writeToEEPROM();
 void readFromEEPROM();
-// void parseAux();
 
 STM32ADC myADC(ADC1);
 
@@ -151,7 +149,7 @@ void setup() {
 
   midi.begin();
   CompositeSerial.begin(9600);  // USB
-  Serial1.begin(115200);          // Aux
+  Serial1.begin(115200);        // Aux
   myTransfer.begin(Serial1);
 
   delay(2000);
@@ -186,19 +184,12 @@ void setup() {
 }
 
 void loop() {
-  // receiveAuxData();
   if (myTransfer.available()) {
     myTransfer.rxObj(auxVal);  // serialTransfer datum (single obj)
-    for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
-      // CompositeSerial.print(auxVal[i]);
-      // CompositeSerial.print(",");
-    }
-    // CompositeSerial.print('\n');
   }
 
   // Deej loop and MIDI values and sending every 10ms
   if (mytimer.repeat()) {
-    // parseAux();            // Puts Aux fader values into an array (auxVal)
     updateSliderValues();  // Reads fader analog values. Also maps all faders.
     filteredAnalog();      // MIDI. Checks for changed value before sending.
     if (deej > 0) {
@@ -513,68 +504,6 @@ void filteredAnalog() {
     }
   }
 }
-
-// Reads Serial1 input for Aux fader values
-void receiveAuxData() {
-  static bool recvAuxInProgress = false;
-  char startMarker = '<';
-  char endMarker = '>';
-  static byte ndx = 0;
-  char rc;
-
-  while (Serial1.available() > 0 && newAux == false) {
-    rc = Serial1.read();
-    // CompositeSerial.print("rc:");  // print rc
-    // CompositeSerial.print(rc);     // print rc
-    // CompositeSerial.print('\n');   // print rc
-    if (recvAuxInProgress == true) {
-      if (rc != endMarker) {
-        // CompositeSerial.println("debugging");  // debugging
-        receivedCharsAux[ndx] = rc;
-        ndx++;
-        if (ndx >= MAX_RECEIVE_LENGTH) {
-          ndx = MAX_RECEIVE_LENGTH - 1;
-        }
-      } else {                         // end marker
-        receivedCharsAux[ndx] = '\0';  // terminate the string
-        recvAuxInProgress = false;
-        ndx = 0;
-        newAux = true;
-      }
-    }
-
-    else if (rc == startMarker) {
-      recvAuxInProgress = true;
-    }
-  }
-}
-
-// Gets Aux fader values and stores them in auxVal array.
-/*/
-void parseAux() {
-  char stringAux[MAX_AUX_LENGTH];
-  char *strtokIndx1;
-
-  // new parseData for aux:
-  if (newAux == true) {
-    strcpy(stringAux, receivedCharsAux);
-    // this temporary copy is necessary to protect the original data
-    // because strtok() used below replaces the commas with \0
-
-    for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
-      if (i == 0) {
-        strtokIndx1 = strtok(stringAux, ",");
-      } else if (strtokIndx1 != NULL) {
-        strtokIndx1 = strtok(NULL, ",");  // next token
-      }
-      intAux = atoi(strtokIndx1);  // convert this part to an integer
-      auxVal[i] = intAux;
-    }
-
-    newAux = false;
-  }
-}
-/*/
 
 // Called every 10ms
 void updateSliderValues() {

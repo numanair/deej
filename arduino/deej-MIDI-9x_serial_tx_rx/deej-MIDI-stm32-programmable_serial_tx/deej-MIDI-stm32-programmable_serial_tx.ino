@@ -31,11 +31,13 @@ void setup() {
   for (int i = 0; i < NUM_SLIDERS; i++) {
     pinMode(analogInputs[i], INPUT);
   }
-  pinMode(PC13, OUTPUT);
+  const int LED_PIN = PC13;
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, LOW); // LED off on blue pill
 
   myADC.calibrate();
 
-  Serial.begin(9600);   // usb serial
+  Serial.begin(9600);     // usb serial
   Serial1.begin(115200);  // UART port 1
   myTransfer.begin(Serial1);
 
