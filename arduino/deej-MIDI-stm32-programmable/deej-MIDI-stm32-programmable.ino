@@ -14,7 +14,7 @@
 // https://www.midi.org/specifications-old/item/table-3-control-change-messages-data-bytes-2
 // https://anotherproducer.com/online-tools-for-musicians/midi-cc-list/
 
-const String firmwareVersion = "v1.1.0";
+const String firmwareVersion = "v1.1.1";
 
 // Number of potentiometers or faders
 const uint8_t NUM_SLIDERS = 5;
@@ -100,6 +100,7 @@ void setup() {
     pinMode(analogInputs[i], INPUT_ANALOG);
   }
   pinMode(PC13, OUTPUT);
+  digitalWrite(PC13, LOW);  // Turn on LED during boot
   mytimer2.start();
 
   myADC.calibrate();
@@ -127,7 +128,7 @@ void setup() {
   midi.begin();
   CompositeSerial.begin(9600);
 
-  delay(3000);
+  delay(1000);
   // EEPROM setup:
   const int addressFlag = 10;
   if (EEPROM.read(addressFlag) == 200) {
@@ -154,6 +155,7 @@ void setup() {
   }
 
   delay(500);
+  digitalWrite(PC13, HIGH);  // Turn off LED on Blue Pill boards
 }
 
 void loop() {
