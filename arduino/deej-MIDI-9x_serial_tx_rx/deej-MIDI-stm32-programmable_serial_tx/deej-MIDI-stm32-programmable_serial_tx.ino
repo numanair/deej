@@ -6,7 +6,7 @@
 #include <neotimer.h>
 
 // AXILLARY (secondary) board firmware
-const String firmwareVersion = "v1.1.0-tx-dev";
+const String firmwareVersion = "v1.1.0-tx";
 
 // Number of potentiometers or faders
 const uint8_t NUM_SLIDERS = 5;      // Faders connected to primary board
@@ -33,7 +33,7 @@ void setup() {
   }
   const int LED_PIN = PC13;
   pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, LOW); // LED off on blue pill
+  digitalWrite(LED_PIN, HIGH);  // Turn LED off for blue pill boards
 
   myADC.calibrate();
 

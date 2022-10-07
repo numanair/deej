@@ -20,7 +20,7 @@
 // https://github.com/jrullan/neotimer
 // https://github.com/RobTillaart/MultiMap
 
-const String firmwareVersion = "v1.1.0-rx-dev";
+const String firmwareVersion = "v1.1.0-rx";
 
 // Number of potentiometers or faders
 const uint8_t NUM_SLIDERS = 5;      // Faders connected to primary board
@@ -30,6 +30,7 @@ const uint8_t NUM_TOTAL_SLIDERS =
 
 // Potentiometer pins assignment
 const uint8_t analogInputs[NUM_SLIDERS] = {PA0, PA1, PA2, PA3, PA4};
+const uint8_t LED_PIN = PC13;
 
 uint8_t midi_channel[NUM_TOTAL_SLIDERS] = {1, 1, 1, 1, 1,
                                            1, 1, 1, 1};  // 1 through 16
@@ -95,6 +96,7 @@ uint16_t auxVal[NUM_AUX_SLIDERS] = {0};
 
 Neotimer mytimer = Neotimer(10);  // ms ADC polling interval
 Neotimer mytimer2 = Neotimer(2000);
+Neotimer mytimer3 = Neotimer(1000);  // Prevent rapid error messages
 // ms delay before saving settings/resuming Deej output.
 // Also prevents rapid EEPROM writes.
 
@@ -123,6 +125,7 @@ void setup() {
   }
   // LED is inverted on these boards
   pinMode(PC13, OUTPUT);
+  digitalWrite(LED_PIN, HIGH);  // Turn LED off for blue pill boards
   mytimer2.start();
 
   myADC.calibrate();
@@ -507,15 +510,19 @@ void filteredAnalog() {
 
 // Called every 10ms
 void updateSliderValues() {
-  // if (myTransfer.status = 0) {
-  // no serial error
-  // Apply mapping to Aux faders (external)
-  for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
-    analogSliderValues[i] =
-        multiMap<uint16>(auxVal[i], adjustedinputval, idealOutputValues,
-                         arrayQty);  //  Aux fader data from I2C
+  if (myTransfer.status > 0) {
+    // no serial error
+    // Apply mapping to Aux faders (external)
+    for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
+      analogSliderValues[i] =
+          multiMap<uint16>(auxVal[i], adjustedinputval, idealOutputValues,
+                           arrayQty);  //  Aux fader data from I2C
+    }
+  } else if (deej <= 0 && mytimer3.repeat()) {
+    // If Deej is not enabled, print error to USB serial.
+    CompositeSerial.println(myTransfer.status);
   }
-  // }
+
   // Apply mapping to mainboard faders (local)
   for (int i = NUM_AUX_SLIDERS; i < NUM_TOTAL_SLIDERS; i++) {
     analogSliderValues[i] =
