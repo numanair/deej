@@ -10,27 +10,11 @@ If you have a 1st edition mixer (shipped before May 20th, 2022), please refer to
 
 ## Features / Versions
 
-### v1.1.0
-
-- Add user defined min/max limits to fader outputs. Toggle modes with `m`
-- Add help menu accessible from `h`
-
-### v1.0.0
-
-- Automatically saves MIDI CC and channel settings, even if the mixer is unplugged
-- Check current settings with `c`
-- Check firmware version with `v`
-- Temporarily pause (and resume) Deej output with `d`
-
-### Legacy
-
-- Per-session MIDI settings
-- Simultaneous Deej & MIDI support (also present in later releases)
-- Mixers shipped before May 20th, 2022
+[Changelog](../Docs/changelog.md)
 
 ## Fader Assignment Steps
 
-![CoolTerm serial demo](https://github.com/numanair/deej/blob/stm32-logic-saving/Docs/Images/Animation_trimmed_ff.gif)
+![CoolTerm serial demo](../Docs/Images/Animation_trimmed_ff.gif)
 
 ### 1. Setup Serial Tools
 
@@ -38,23 +22,23 @@ Fader assignment is done through serial instead of MIDI. This allows for reassig
 
 Any serial terminal can be used, but for this tutorial we will use CoolTerm. The free download is available here: <https://www.freeware.the-meiers.org/> *NOTE:* The regular downloads are on the left. Don't mistakenly download an older or different version from the middle section.
 
-![CoolTerm Download](https://github.com/numanair/deej/blob/stm32-logic-saving/Docs/Images/CoolTerm-dl.png)
+![CoolTerm Download](../Docs/Images/CoolTerm-dl.png)
 
 ### 2. Connect The Terminal
 
-Open CoolTerm and click *Options*. Make sure the baud rate is set to 9600 (usually the default). Choose the correct port from the serial port options. The correct port will vary depending on a number of factors. If you are using Windows, you may check device manager to find which port is assigned. After choosing a port, click the connect button. You will know you have the right port when you click connect and see a stream of numbers formatted like so: 1023|0|0|460|120
+Open CoolTerm and click *Options*. Make sure the baud rate is set to 9600 (usually the default). Choose the correct port from the serial port options. The correct port will vary depending on a number of factors. If you are using Windows, you may check device manager to find which port is assigned. After choosing a port, click the connect button. You will know you have the right port when you click connect and see a stream of numbers formatted like so: `1023|0|0|460|120`
 
 If you are on Windows and do not see a COM port for the mixer, please follow these [driver installation instructions](https://github.com/numanair/deej/blob/stm32-logic/Docs/Windows%20Driver%20Install%20for%20MIDI%20Mixer.md).
 
 To pause this output and better see the messages from the mixer, send `d`. If you wish to resume this output for use with Deej, simply send `d` again.
 
-![CoolTerm ports](https://github.com/numanair/deej/blob/stm32-logic-saving/Docs/Images/coolterm_ports.png)
+![CoolTerm ports](../Docs/Images/coolterm_ports.png)
 
 ### 3. Create and Send the New Configuration
 
 Here is an example of MIDI settings used to reassign the faders.  
 
-```bat
+```json
 <07,07,19,21,11:01,02,01,01,01>
 ```  
 
@@ -66,7 +50,7 @@ To send this configuration to the mixer, use the "send string" feature of CoolTe
 
 If you want to make a small change, first send the character `c` to retrieve the current settings. The terminal will print out the settings, which you can copy, modify and send back to reprogram.
 
-![CoolTerm connect and send](https://github.com/numanair/deej/blob/stm32-logic-saving/Docs/Images/coolterm_connect+send.png)
+![CoolTerm connect and send](../Docs/Images/coolterm_connect+send.png)
 
 As soon as you send the string, the mixer will report back the new settings in the terminal. After a small delay the settings are saved to the MIX5R Pro.
 
@@ -77,7 +61,7 @@ If you are satisfied with the new settings you may close the serial terminal (Co
 New in version v1.1.0 is the ability to set min/max limits for each fader's output. Switch to limits assignment mode with `m`. If you are already in Limits Mode, `m` will switch back to CC/channel assignment mode. Setting limits works like setting CC's. The format is <lower_limit:upper_limit>.
 For example, the default full-range MIDI output is:  
 
-```bat
+```json
 <0,0,0,0,0:127,127,127,127,127>
 ```  
 
