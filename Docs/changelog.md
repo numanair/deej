@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.1.1
+
+- Internal status LED turns off after startup
+
 ## v1.1.0
 
 - Add user defined min/max limits to fader outputs. Toggle modes with `m`
