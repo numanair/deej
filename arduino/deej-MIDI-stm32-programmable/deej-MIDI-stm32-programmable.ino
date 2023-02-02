@@ -14,7 +14,7 @@
 // https://www.midi.org/specifications-old/item/table-3-control-change-messages-data-bytes-2
 // https://anotherproducer.com/online-tools-for-musicians/midi-cc-list/
 
-const String firmwareVersion = "v1.1.1";
+const String firmwareVersion = "v1.1.2";
 
 // Number of potentiometers or faders
 const uint8_t NUM_SLIDERS = 5;
@@ -194,7 +194,7 @@ void loop() {
       printSettings();
     } else {
       parseFaderLimits();
-      // Output MIDI limuts to serial in the input format
+      // Output MIDI limits to serial in the input format
       CompositeSerial.println("New MIDI Limits:");
       printLimitSettings();
     }
@@ -208,6 +208,10 @@ void loop() {
     prog_end = 1;
     newData = false;
   }
+
+  // Checks for incoming MIDI.
+  // Currently only to prevent hangs on some software
+  midi.poll();
 }
 
 void writeToEEPROM(int addressRead, byte byteArray[], int arraySize, int max) {
