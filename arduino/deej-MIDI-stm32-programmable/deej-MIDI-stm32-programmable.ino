@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <EEPROM.h>
+#include <ResponsiveAnalogRead.h>
 #include <STM32ADC.h>
 #include <USBComposite.h>
 #include <neotimer.h>
@@ -41,8 +42,10 @@ int integerFromPC = 0;
 bool newData = false;
 
 // Adjusts linearity correction for my specific potentiometers.
-// 1 = fully linear but jittery. 0.7 is about max for no jitter.
-const float correctionMultiplier = 0.60;
+// 1 = fully linear but affects resolution. 0.7 is about max for no impact.
+// const float correctionMultiplier = 0.0;
+const float correctionMultiplier = 0.60;  // good balance
+// const float correctionMultiplier = 1.00;
 const uint8_t threshold = 32;  // 32ish
 
 // measured output every equal 5mm increment in 12-bit. Minimum and maximum
@@ -52,7 +55,7 @@ const uint16_t measuredInput[] = {19,   50,   165,  413,  907,  1450, 1975,
 
 // Calculate number of elements in the MultiMap arrays
 const uint8_t arrayQty = sizeof(measuredInput) / sizeof(measuredInput[0]);
-uint16_t adjustedinputval[arrayQty] = {0};  // Same type as measuredInput
+uint16_t adjustedInputVal[arrayQty] = {0};  // Same type as measuredInput
 
 // Probably no need to change these calculated values
 uint16_t idealOutputValues[arrayQty] = {
@@ -74,12 +77,14 @@ int addressWriteChan = addressWriteCC + NUM_SLIDERS;
 int addressWriteUpperLimit = addressWriteChan + NUM_SLIDERS;
 int addressWriteLowerLimit = addressWriteUpperLimit + NUM_SLIDERS;
 
-Neotimer mytimer = Neotimer(10);  // ms ADC polling interval
+Neotimer mytimer = Neotimer(1);     // ms ADC polling interval
+Neotimer deejtimer = Neotimer(10);  // ms send deej
 Neotimer mytimer2 = Neotimer(2000);
 // ms delay before saving settings/resuming Deej output.
 // Also prevents rapid EEPROM writes.
 
 USBMIDI midi;
+
 USBCompositeSerial CompositeSerial;
 
 void sendSliderValues();
@@ -95,9 +100,19 @@ void readFromEEPROM();
 
 STM32ADC myADC(ADC1);
 
+// Initialize ResponsiveAnalogRead object size
+// The actual settings are initialized later
+ResponsiveAnalogRead analog[NUM_SLIDERS];
+
 void setup() {
+  const int adc_bits = 12;
   for (int i = 0; i < NUM_SLIDERS; i++) {
-    pinMode(analogInputs[i], INPUT_ANALOG);
+    // ResponsiveAnalogRead settings
+    // (pin, sleep, snapMultiplier)
+    analog[i] = ResponsiveAnalogRead(analogInputs[i], true, .0001);
+    analog[i].setAnalogResolution(1 << adc_bits);  // 2^adc_bits
+    analog[i].setActivityThreshold(threshold);
+    analog[i].enableEdgeSnap();
   }
   pinMode(PC13, OUTPUT);
   digitalWrite(PC13, LOW);  // Turn on LED during boot
@@ -116,14 +131,14 @@ void setup() {
 
   // multiplier correction
   for (size_t i = 0; i < arrayQty; i++) {
-    adjustedinputval[i] =
+    adjustedInputVal[i] =
         round(idealOutputValues[i] +
               (measuredInput[i] - idealOutputValues[i]) * correctionMultiplier);
     // theoretical ideal + (measured - theoretical) * multi
   }
   // Excludes min and max from adjustment by correctionMultiplier
-  adjustedinputval[0] = idealOutputValues[0];  // min value
-  adjustedinputval[arrayQty - 1] = idealOutputValues[arrayQty - 1];
+  adjustedInputVal[0] = idealOutputValues[0];  // min value
+  adjustedInputVal[arrayQty - 1] = idealOutputValues[arrayQty - 1];
 
   midi.begin();
   CompositeSerial.begin(9600);
@@ -163,7 +178,8 @@ void loop() {
   if (mytimer.repeat()) {
     updateSliderValues();  // Gets new slider values
     filteredAnalog();      // MIDI
-    if (deej > 0) {
+
+    if (deej > 0 && deejtimer.repeat()) {
       sendSliderValues();  // Deej Serial
     } else if (mytimer2.done()) {
       if (prog_end) {
@@ -266,6 +282,7 @@ void recvWithStartEndMarkers() {
       }
     }
 
+    // replace with switch case?
     else if (rc == startMarker) {
       recvInProgress = true;
     }
@@ -293,9 +310,7 @@ void recvWithStartEndMarkers() {
       } else {
         CompositeSerial.println("Limits Min/Max Assignment Mode");
       }
-    }
-
-    else if (rc == togDeej) {
+    } else if (rc == togDeej) {
       if (deej > 0) {
         deej = -1;  // disable deej serial output
         CompositeSerial.println("Deej disabled.");
@@ -303,9 +318,7 @@ void recvWithStartEndMarkers() {
         deej = 1;  // re-enable deej serial output
         CompositeSerial.println("Deej enabled.");
       }
-    }
-
-    else if (rc == helpMode) {
+    } else if (rc == helpMode) {
       deej = -1;                    // disable deej
       CompositeSerial.print('\n');  // newline
       CompositeSerial.println("MIX5R Pro Help:");
@@ -447,31 +460,34 @@ void printLimitSettings() {
 
 void filteredAnalog() {
   for (int i = 0; i < NUM_SLIDERS; i++) {
-    new_value[i] = analogSliderValues[i];  // 12-bit
-    // If difference between new_value and old_value is greater than
-    // threshold, send new values
-    if ((new_value[i] != old_value[i] &&
-         abs(new_value[i] - old_value[i]) > threshold)) {
-      // Update old_value
-      old_value[i] = new_value[i];
-      // convert from 12-bit to 7-bit for MIDI
-      new_value[i] = floor(new_value[i] / 32);
-      // if (new_value[i] > 127) {
-      //   new_value[i] = 127;  // cap output to MIDI range
-      // }
+    if (analog[i].hasChanged()) {
+      uint adaptiveval = analogSliderValues[i];
 
-      new_midi_value[i] =
-          map(new_value[i], 0, 127, cc_lower_limit[i], cc_upper_limit[i]);
-      if (new_midi_value[i] != old_midi_value[i]) {
-        // Update old_midi_value
-        old_midi_value[i] = new_midi_value[i];
-        if (new_midi_value[i] > 127) {
-          new_midi_value[i] = 127;  // cap output to MIDI range
-        }
+      // linear adjustment
+      adaptiveval = multiMap<uint16>(adaptiveval, adjustedInputVal,
+                                     idealOutputValues, arrayQty);
+
+      // trim ends (add deadzone)
+      const uint lower_deadzone = 1;
+      const uint upper_deadzone = 4095 - 1;
+      adaptiveval = constrain(adaptiveval, lower_deadzone, upper_deadzone);
+      adaptiveval = map(adaptiveval, lower_deadzone, upper_deadzone, 0, 4095);
+
+      adaptiveval = adaptiveval >> 5;  // 12 to 7-bit (128)
+      constrain(adaptiveval, 0, 127);  // cap output to MIDI range
+
+      // map to user specified range
+      new_value[i] =
+          map(adaptiveval, 0, 127, cc_lower_limit[i], cc_upper_limit[i]);
+
+      if (new_value[i] != old_value[i]) {
+        // Update old value from new one
+        old_value[i] = new_value[i];
+
         // Send MIDI
-        // channel starts at 0, but midi_channel starts at 1
+        // Channel starts at 0, but midi_channel starts at 1.
         midi.sendControlChange(midi_channel[i] - 1, cc_command[i],
-                               new_midi_value[i]);
+                               new_value[i]);
       }
     }
   }
@@ -479,10 +495,8 @@ void filteredAnalog() {
 
 void updateSliderValues() {
   for (int i = 0; i < NUM_SLIDERS; i++) {
-    // analogSliderValues[i] = analogRead(analogInputs[i]);
-    analogSliderValues[i] =
-        multiMap<uint16>(analogRead(analogInputs[i]), adjustedinputval,
-                         idealOutputValues, arrayQty);
+    analog[i].update();  // ResponsiveAnalogRead
+    analogSliderValues[i] = analog[i].getValue();
   }
 }
 
@@ -491,17 +505,17 @@ void sendSliderValues() {
   String builtString = String("");
   for (int i = 0; i < NUM_SLIDERS; i++) {
     // User set limits = 0-127.
-    int minVal10bit =
+    uint minVal10bit =
         cc_lower_limit[i] * (1023.0 / 127.0);  // decimals for float math
-    int maxVal10bit =
+    uint maxVal10bit =
         cc_upper_limit[i] * (1023.0 / 127.0);  // decimals for float math
+    // linearize raw value
+    uint limitedVal = multiMap<uint16>(
+        analog[i].getRawValue(), adjustedInputVal, idealOutputValues, arrayQty);
     // Map Deej output to MIDI limits (7-bit to 10-bit conversion)
-    int limitedVal =
-        map(analogSliderValues[i], idealOutputValues[0],
-            idealOutputValues[arrayQty - 1], minVal10bit, maxVal10bit);
-    if (limitedVal > 1023) {
-      limitedVal = 1023;
-    }
+    limitedVal = map(limitedVal, idealOutputValues[0],
+                     idealOutputValues[arrayQty - 1], minVal10bit, maxVal10bit);
+    constrain(limitedVal, 0, 1023);
     builtString += String((int)limitedVal);
     if (i < NUM_SLIDERS - 1) {
       builtString += String("|");
