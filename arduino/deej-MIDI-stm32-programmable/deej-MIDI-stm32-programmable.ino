@@ -58,8 +58,7 @@ const uint8_t arrayQty = sizeof(measuredInput) / sizeof(measuredInput[0]);
 uint16_t adjustedInputVal[arrayQty] = {0};  // Same type as measuredInput
 
 // Probably no need to change these calculated values
-uint16_t idealOutputValues[arrayQty] = {
-    0, 341, 682, 1024, 1365, 1706, 2048, 2389, 2730, 3072, 3413, 3754, 4095};
+uint16_t idealOutputValues[arrayQty] = {0};
 // Note: 4095 = 2^12 - 1 (the maximum value that can be represented by
 // a 12-bit unsigned number
 
@@ -131,6 +130,9 @@ void setup() {
 
   // multiplier correction
   for (size_t i = 0; i < arrayQty; i++) {
+    // Initialize values for idealOutputValues array (4095 = 2^12 - 1)
+    idealOutputValues[i] = round(i * (4095.0 / (arrayQty - 1)));
+
     adjustedInputVal[i] =
         round(idealOutputValues[i] +
               (measuredInput[i] - idealOutputValues[i]) * correctionMultiplier);
