@@ -15,7 +15,7 @@
 // https://www.midi.org/specifications-old/item/table-3-control-change-messages-data-bytes-2
 // https://anotherproducer.com/online-tools-for-musicians/midi-cc-list/
 
-const String firmwareVersion = "v1.1.2";
+const String firmwareVersion = "v1.2.0";
 
 // Number of potentiometers or faders
 const uint8_t NUM_SLIDERS = 5;
