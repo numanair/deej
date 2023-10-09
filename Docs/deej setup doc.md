@@ -6,7 +6,7 @@ This document covers setup for Deej software for use with MIX5R Pro and other si
 
 * Deej supports Windows and Linux. These steps primarily target Windows, but the general steps apply to both.
 * These steps will work for any Return to Paradise 5-channel mixer, including Deej-only versions. They come pre-flashed, so ignore any references to Arduino sketches.
-* Deej uses *serial* to connect to the mixer. Serial only supports one connection at a time, so any other software that tries to connect will interfere. MIDI connections are separate, so those may remain active simultaneously.
+* Deej uses *serial* to connect to the mixer. Serial only supports one connection at a time, so any other software that tries to connect will interfere. The MIDI connection is separate, so it may remain active alongside serial.
 
 ## Setup
 
