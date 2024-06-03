@@ -343,7 +343,7 @@ void recvWithStartEndMarkers() {
 }
 
 // <CC,CC,CC,CC,CC:CH,CH,CH,CH,CH>
-// <07,14,14,14,14>:01,01,01,01,01>
+// <07,14,14,14,14:01,01,01,01,01>
 
 void parseData() {
   // split the data into its parts and recombine
