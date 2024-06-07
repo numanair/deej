@@ -13,3 +13,4 @@ releases/
 logs/
 preferences.yaml
 build/
+arduino/deej-MIDI-9x_serial_tx_rx/build*

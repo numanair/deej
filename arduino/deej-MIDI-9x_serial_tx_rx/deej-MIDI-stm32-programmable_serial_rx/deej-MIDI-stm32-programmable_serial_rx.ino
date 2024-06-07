@@ -1,11 +1,16 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 #include <STM32ADC.h>
-#include <SerialTransfer.h>  // for SerialTransfer
+#include <SerialTransfer.h> // for SerialTransfer
 #include <USBComposite.h>
 #include <neotimer.h>
 
 #include "MultiMap.h"
+
+// If facing compiling errors, comment out I2C in
+// ...\Arduino\libraries\SerialTransfer\src\I2CTransfer.cpp (Comment the whole
+// file)
+// https://github.com/PowerBroker2/SerialTransfer/issues/110#issuecomment-1550184325
 
 // This sketch uses serial input in the following format:
 // <CC,CC,CC,CC,CC:CH,CH,CH,CH,CH>
@@ -23,38 +28,39 @@
 const String firmwareVersion = "v1.1.0-rx";
 
 // Number of potentiometers or faders
-const uint8_t NUM_SLIDERS = 5;      // Faders connected to primary board
-const uint8_t NUM_AUX_SLIDERS = 4;  //  Faders on secondary I2C board
+const uint8_t NUM_SLIDERS = 6;     // Faders connected to primary board
+const uint8_t NUM_AUX_SLIDERS = 6; //  Faders on secondary serial board
 const uint8_t NUM_TOTAL_SLIDERS =
-    NUM_AUX_SLIDERS + NUM_SLIDERS;  //  Total faders count
+    NUM_AUX_SLIDERS + NUM_SLIDERS; //  Total faders count
 
 // Potentiometer pins assignment
-const uint8_t analogInputs[NUM_SLIDERS] = {PA0, PA1, PA2, PA3, PA4};
-const uint8_t LED_PIN = PC13;
+const uint8_t analogInputs[NUM_SLIDERS] = {PA0, PA1, PA2, PA3, PA4, PA5};
+const uint8_t LED_PIN = PB2;
 
-uint8_t midi_channel[NUM_TOTAL_SLIDERS] = {1, 1, 1, 1, 1,
-                                           1, 1, 1, 1};  // 1 through 16
-uint8_t cc_command[NUM_TOTAL_SLIDERS] = {1, 11, 7, 14, 21,
-                                         2, 3,  4, 5};  // MIDI CC number
+uint8_t midi_channel[NUM_TOTAL_SLIDERS] = {1, 1, 1, 1, 1, 1,
+                                           1, 1, 1, 1, 1, 1}; // 1 through 16
+uint8_t cc_command[NUM_TOTAL_SLIDERS] = {1, 11, 7,  14, 21, 2, 3,
+                                         4, 5,  10, 73, 91}; // MIDI CC number
 
 uint8_t cc_lower_limit[NUM_TOTAL_SLIDERS] = {
-    0, 0, 0, 0, 0, 0, 0, 0};  // optionally limit range of MIDI CC per fader
+    0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0}; // optionally limit range of MIDI CC per fader
 uint8_t cc_upper_limit[NUM_TOTAL_SLIDERS] = {
-    127, 127, 127, 127, 127,
-    127, 127, 127, 127};  // optionally limit range of MIDI CC per fader
+    127, 127, 127, 127, 127, 127, 127,
+    127, 127, 127, 127, 127}; // optionally limit range of MIDI CC per fader
 
-const byte MAX_RECEIVE_LENGTH = (NUM_TOTAL_SLIDERS * 4 - 1) * 2 + 1 + 6;
+const byte MAX_RECEIVE_LENGTH = (NUM_TOTAL_SLIDERS * 5 - 1) * 2 + 1 + 6;
 char receivedChars[MAX_RECEIVE_LENGTH];
-char tempChars[MAX_RECEIVE_LENGTH];  // temporary array for use when parsing
+char tempChars[MAX_RECEIVE_LENGTH]; // temporary array for use when parsing
 
 const byte MAX_AUX_LENGTH = NUM_AUX_SLIDERS * 4;
 char receivedCharsAux[MAX_AUX_LENGTH];
-char tempCharsAux[MAX_AUX_LENGTH];  // temporary array for use when parsing
+char tempCharsAux[MAX_AUX_LENGTH]; // temporary array for use when parsing
 
 // Adjusts linearity correction for my specific potentiometers.
 // 1 = fully linear but jittery. 0.7 is about max for no jitter.
 const float correctionMultiplier = 0.60;
-const uint8_t threshold = 32;  // 32ish
+const uint8_t threshold = 32; // 32ish
 
 // measured output every equal 5mm increment in 12-bit. Minimum and maximum
 // values are not affected by correctionMultiplier.
@@ -63,7 +69,7 @@ const uint16_t measuredInput[] = {19,   50,   165,  413,  907,  1450, 1975,
 
 // Calculate number of elements in the MultiMap arrays
 const uint8_t arrayQty = sizeof(measuredInput) / sizeof(measuredInput[0]);
-uint16_t adjustedinputval[arrayQty] = {0};  // Same type as measuredInput
+uint16_t adjustedinputval[arrayQty] = {0}; // Same type as measuredInput
 
 // Probably no need to change these calculated values
 uint16_t idealOutputValues[arrayQty] = {
@@ -71,7 +77,7 @@ uint16_t idealOutputValues[arrayQty] = {
 // Note: 4095 = 2^12 - 1 (the maximum value that can be represented by
 // a 12-bit unsigned number
 
-int deej = 1;  // 1=enabled 0=paused -1=disabled
+int deej = 1; // 1=enabled 0=paused -1=disabled
 int old_value[NUM_TOTAL_SLIDERS] = {0};
 int new_value[NUM_TOTAL_SLIDERS] = {0};
 int old_midi_value[NUM_TOTAL_SLIDERS] = {0};
@@ -94,9 +100,9 @@ bool newAux = false;
 
 uint16_t auxVal[NUM_AUX_SLIDERS] = {0};
 
-Neotimer mytimer = Neotimer(10);  // ms ADC polling interval
+Neotimer mytimer = Neotimer(10); // ms ADC polling interval
 Neotimer mytimer2 = Neotimer(2000);
-Neotimer mytimer3 = Neotimer(1000);  // Prevent rapid error messages
+Neotimer mytimer3 = Neotimer(1000); // Prevent rapid error messages
 // ms delay before saving settings/resuming Deej output.
 // Also prevents rapid EEPROM writes.
 
@@ -125,15 +131,15 @@ void setup() {
   }
   // LED is inverted on these boards
   pinMode(PC13, OUTPUT);
-  digitalWrite(LED_PIN, HIGH);  // Turn LED off for blue pill boards
+  digitalWrite(LED_PIN, HIGH); // Turn LED off for blue pill boards
   mytimer2.start();
 
   myADC.calibrate();
 
-  USBComposite.clear();  // clear any plugins previously registered
+  USBComposite.clear(); // clear any plugins previously registered
   CompositeSerial.registerComponent();
   midi.registerComponent();
-  USBComposite.setVendorId(0xFEED);  // STMicroelectronics
+  USBComposite.setVendorId(0xFEED); // STMicroelectronics
   USBComposite.setProductId(0xF1CC);
   USBComposite.setManufacturerString("Return to Paradise");
   USBComposite.setProductString("MIX5R Pro");
@@ -147,13 +153,13 @@ void setup() {
     // theoretical ideal + (measured - theoretical) * multi
   }
   // Excludes min and max from adjustment by correctionMultiplier
-  adjustedinputval[0] = idealOutputValues[0];  // min value
+  adjustedinputval[0] = idealOutputValues[0]; // min value
   adjustedinputval[arrayQty - 1] = idealOutputValues[arrayQty - 1];
 
   midi.begin();
-  CompositeSerial.begin(9600);  // USB
-  Serial1.begin(115200);        // Aux
-  myTransfer.begin(Serial1);
+  CompositeSerial.begin(9600); // USB
+  Serial1.begin(115200);       // Aux
+  myTransfer.begin(Serial1);   // Serial transfer between boards. RX1 and TX1
 
   delay(2000);
   // EEPROM setup:
@@ -161,26 +167,26 @@ void setup() {
   if (EEPROM.read(addressFlag) == 200) {
     // EEPROM already set. Reading.
     CompositeSerial.println("EEPROM already set. Reading");
-    readFromEEPROM(addressWriteCC, cc_command, NUM_TOTAL_SLIDERS, 127);  // CC
+    readFromEEPROM(addressWriteCC, cc_command, NUM_TOTAL_SLIDERS, 127); // CC
     readFromEEPROM(addressWriteChan, midi_channel, NUM_TOTAL_SLIDERS,
-                   16);  // Channel
+                   16); // Channel
     readFromEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_TOTAL_SLIDERS,
-                   127);  // Lower bound of each fader output
+                   127); // Lower bound of each fader output
     readFromEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_TOTAL_SLIDERS,
-                   127);   // Upper bound of each fader output
-    printSettings();       // print settings to serial
-    printLimitSettings();  // print settings to serial
+                   127);  // Upper bound of each fader output
+    printSettings();      // print settings to serial
+    printLimitSettings(); // print settings to serial
   } else {
     // First run, set EEPROM data to defaults
     CompositeSerial.println("First run, set EEPROM data to defaults");
-    writeToEEPROM(addressWriteCC, cc_command, NUM_TOTAL_SLIDERS, 127);  // CC
+    writeToEEPROM(addressWriteCC, cc_command, NUM_TOTAL_SLIDERS, 127); // CC
     writeToEEPROM(addressWriteChan, midi_channel, NUM_TOTAL_SLIDERS,
-                  16);  // Channel
+                  16); // Channel
     writeToEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_TOTAL_SLIDERS,
-                  127);  // Lower bound of each fader output
+                  127); // Lower bound of each fader output
     writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_TOTAL_SLIDERS,
-                  127);              // Upper bound of each fader output
-    EEPROM.write(addressFlag, 200);  // mark EEPROM as set
+                  127);             // Upper bound of each fader output
+    EEPROM.write(addressFlag, 200); // mark EEPROM as set
   }
 
   delay(800);
@@ -188,15 +194,15 @@ void setup() {
 
 void loop() {
   if (myTransfer.available()) {
-    myTransfer.rxObj(auxVal);  // serialTransfer datum (single obj)
+    myTransfer.rxObj(auxVal); // serialTransfer datum (single obj)
   }
 
   // Deej loop and MIDI values and sending every 10ms
   if (mytimer.repeat()) {
-    updateSliderValues();  // Reads fader analog values. Also maps all faders.
-    filteredAnalog();      // MIDI. Checks for changed value before sending.
+    updateSliderValues(); // Reads fader analog values. Also maps all faders.
+    filteredAnalog();     // MIDI. Checks for changed value before sending.
     if (deej > 0) {
-      sendSliderValues();  // Deej Serial
+      sendSliderValues(); // Deej Serial
     } else if (mytimer2.done()) {
       if (prog_end) {
         writeToEEPROM(addressWriteCC, cc_command, NUM_TOTAL_SLIDERS, 127);
@@ -212,7 +218,7 @@ void loop() {
         }
       }
       if (deej >= 0) {
-        deej = 1;  // if deej paused then resume
+        deej = 1; // if deej paused then resume
       }
     }
   }
@@ -272,11 +278,11 @@ void recvWithStartEndMarkers() {
   static byte ndx = 0;
   char startMarker = '<';
   char endMarker = '>';
-  char retSettings = 'c';    // print settings command
-  char retVersion = 'v';     // print firmware version
-  char togDeej = 'd';        // toggle Deej
-  char togLimitsEdit = 'm';  // toggle adjusting output limits min/max
-  char helpMode = 'h';       // help
+  char retSettings = 'c';   // print settings command
+  char retVersion = 'v';    // print firmware version
+  char togDeej = 'd';       // toggle Deej
+  char togLimitsEdit = 'm'; // toggle adjusting output limits min/max
+  char helpMode = 'h';      // help
   char rc;
 
   while (CompositeSerial.available() > 0 && newData == false) {
@@ -290,7 +296,7 @@ void recvWithStartEndMarkers() {
           ndx = MAX_RECEIVE_LENGTH - 1;
         }
       } else {
-        receivedChars[ndx] = '\0';  // terminate the string
+        receivedChars[ndx] = '\0'; // terminate the string
         recvInProgress = false;
         ndx = 0;
         newData = true;
@@ -318,7 +324,7 @@ void recvWithStartEndMarkers() {
 
     else if (rc == togLimitsEdit) {
       // toggles saving CC/CH or setting the limits for max fader output
-      CC_CH_mode = !CC_CH_mode;  // toggle
+      CC_CH_mode = !CC_CH_mode; // toggle
       if (CC_CH_mode) {
         CompositeSerial.println("CC & Channel Assignment Mode");
       } else {
@@ -328,17 +334,17 @@ void recvWithStartEndMarkers() {
 
     else if (rc == togDeej) {
       if (deej > 0) {
-        deej = -1;  // disable deej serial output
+        deej = -1; // disable deej serial output
         CompositeSerial.println("Deej disabled.");
       } else if (deej < 0) {
-        deej = 1;  // re-enable deej serial output
+        deej = 1; // re-enable deej serial output
         CompositeSerial.println("Deej enabled.");
       }
     }
 
     else if (rc == helpMode) {
-      deej = -1;                    // disable deej
-      CompositeSerial.print('\n');  // newline
+      deej = -1;                   // disable deej
+      CompositeSerial.print('\n'); // newline
       CompositeSerial.println("MIX5R Pro Help:");
       CompositeSerial.println("h - This help menu");
       CompositeSerial.println("v - Print current firmware version");
@@ -346,7 +352,7 @@ void recvWithStartEndMarkers() {
           "m - toggle assigning MIDI CC/Channel or setting output min/max");
       CompositeSerial.println("c - Print current settings");
       CompositeSerial.println("d - Toggle Deej serial output");
-      CompositeSerial.print('\n');  // newline
+      CompositeSerial.print('\n'); // newline
       CompositeSerial.println("Settings are assigned in this format:");
       CompositeSerial.println("<1,11,7,14,21,2,3,4,5:1,1,1,1,1,1,1,1,1>");
       CompositeSerial.println(
@@ -367,9 +373,9 @@ void parseData() {
   char stringCC[MAX_RECEIVE_LENGTH / 2] = {0};
   char stringCHAN[MAX_RECEIVE_LENGTH / 2] = {0};
 
-  char *strtokIndx1;  // CC... / CH...
-  char *
-      strtokIndx2;  // Somehow two pointers is less flash used than a single one
+  char *strtokIndx1; // CC... / CH...
+  char
+      *strtokIndx2; // Somehow two pointers is less flash used than a single one
 
   strtokIndx1 = strtok(tempChars, ":");
   strcpy(stringCC, strtokIndx1);
@@ -383,25 +389,25 @@ void parseData() {
     if (i == 0) {
       strtokIndx2 = strtok(stringCC, ",");
     } else if (strtokIndx1 != NULL) {
-      strtokIndx2 = strtok(NULL, ",");  // next token
+      strtokIndx2 = strtok(NULL, ","); // next token
     }
-    integerFromPC = atoi(strtokIndx2);  // convert this part to an integer
+    integerFromPC = atoi(strtokIndx2); // convert this part to an integer
     cc_command[i] = integerFromPC;
   }
   // End CC code
 
-  stringCHAN[NUM_TOTAL_SLIDERS * 3] = '\0';  // NULL terminate
+  stringCHAN[NUM_TOTAL_SLIDERS * 3] = '\0'; // NULL terminate
 
   // Start Channel code
   for (int i = 0; i < NUM_TOTAL_SLIDERS; i++) {
     if (i == 0) {
       strtokIndx2 = strtok(stringCHAN, ",");
     } else if (strtokIndx2 != NULL) {
-      strtokIndx2 = strtok(NULL, ",");  // next token
+      strtokIndx2 = strtok(NULL, ","); // next token
     }
-    integerFromPC = atoi(strtokIndx2);  // convert this part to an integer
+    integerFromPC = atoi(strtokIndx2); // convert this part to an integer
     midi_channel[i] = integerFromPC;
-  }  // End Channel code
+  } // End Channel code
 }
 
 void parseFaderLimits() {
@@ -410,9 +416,9 @@ void parseFaderLimits() {
   char stringLowerLim[MAX_RECEIVE_LENGTH / 2] = {0};
   char stringUpperLim[MAX_RECEIVE_LENGTH / 2] = {0};
 
-  char *strtokIndx1;  // CC... / CH...
-  char *
-      strtokIndx2;  // Somehow two pointers is less flash used than a single one
+  char *strtokIndx1; // CC... / CH...
+  char
+      *strtokIndx2; // Somehow two pointers is less flash used than a single one
 
   strtokIndx1 = strtok(tempChars, ":");
   strcpy(stringLowerLim, strtokIndx1);
@@ -426,9 +432,9 @@ void parseFaderLimits() {
     if (i == 0) {
       strtokIndx2 = strtok(stringLowerLim, ",");
     } else if (strtokIndx1 != NULL) {
-      strtokIndx2 = strtok(NULL, ",");  // next token
+      strtokIndx2 = strtok(NULL, ","); // next token
     }
-    integerFromPC = atoi(strtokIndx2);  // convert this part to an integer
+    integerFromPC = atoi(strtokIndx2); // convert this part to an integer
     cc_lower_limit[i] = integerFromPC;
   }
   // End new lower limit code
@@ -438,10 +444,10 @@ void parseFaderLimits() {
     if (i == 0) {
       strtokIndx2 = strtok(stringUpperLim, ",");
     } else if (strtokIndx2 != NULL) {
-      strtokIndx2 = strtok(NULL, ",");  // next token
+      strtokIndx2 = strtok(NULL, ","); // next token
     }
-    integerFromPC = atoi(strtokIndx2);  // convert this part to an integer
-    cc_upper_limit[i] = integerFromPC;  //
+    integerFromPC = atoi(strtokIndx2); // convert this part to an integer
+    cc_upper_limit[i] = integerFromPC; //
   }
   // End new upper limit code
 }
@@ -463,7 +469,7 @@ void printSettings() {
   CompositeSerial.print(":");
   printArray(midi_channel, NUM_TOTAL_SLIDERS);
   CompositeSerial.print(">");
-  CompositeSerial.print('\n');  // newline
+  CompositeSerial.print('\n'); // newline
 }
 
 void printLimitSettings() {
@@ -473,12 +479,12 @@ void printLimitSettings() {
   CompositeSerial.print(":");
   printArray(cc_upper_limit, NUM_TOTAL_SLIDERS);
   CompositeSerial.print(">");
-  CompositeSerial.print('\n');  // newline
+  CompositeSerial.print('\n'); // newline
 }
 
 void filteredAnalog() {
   for (int i = 0; i < NUM_TOTAL_SLIDERS; i++) {
-    new_value[i] = analogSliderValues[i];  // 12-bit
+    new_value[i] = analogSliderValues[i]; // 12-bit
     // If difference between new_value and old_value is greater than
     // threshold, send new values
     if ((new_value[i] != old_value[i] &&
@@ -497,7 +503,7 @@ void filteredAnalog() {
         // Update old_midi_value
         old_midi_value[i] = new_midi_value[i];
         if (new_midi_value[i] > 127) {
-          new_midi_value[i] = 127;  // cap output to MIDI range
+          new_midi_value[i] = 127; // cap output to MIDI range
         }
         // Send MIDI
         // channel starts at 0, but midi_channel starts at 1
@@ -516,7 +522,7 @@ void updateSliderValues() {
     for (int i = 0; i < NUM_AUX_SLIDERS; i++) {
       analogSliderValues[i] =
           multiMap<uint16>(auxVal[i], adjustedinputval, idealOutputValues,
-                           arrayQty);  //  Aux fader data from I2C
+                           arrayQty); //  Aux fader data from serial
     }
   } else if (deej <= 0 && mytimer3.repeat()) {
     // If Deej is not enabled, print error to USB serial.
@@ -537,9 +543,9 @@ void sendSliderValues() {
   for (int i = 0; i < NUM_TOTAL_SLIDERS; i++) {
     // User set limits = 0-127.
     int minVal10bit =
-        cc_lower_limit[i] * (1023.0 / 127.0);  // decimals for float math
+        cc_lower_limit[i] * (1023.0 / 127.0); // decimals for float math
     int maxVal10bit =
-        cc_upper_limit[i] * (1023.0 / 127.0);  // decimals for float math
+        cc_upper_limit[i] * (1023.0 / 127.0); // decimals for float math
     // Map Deej output to MIDI limits (7-bit to 10-bit conversion)
     int limitedVal =
         map(analogSliderValues[i], idealOutputValues[0],
