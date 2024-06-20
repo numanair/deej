@@ -46,7 +46,7 @@ bool newData = false;
 // const float correctionMultiplier = 0.0;
 const float correctionMultiplier = 0.60;  // good balance
 // const float correctionMultiplier = 1.00;
-const uint8_t threshold = 32;  // 32ish
+const uint8_t threshold = 36;  // 32ish
 
 // measured output every equal 5mm increment in 12-bit. Minimum and maximum
 // values are not affected by correctionMultiplier.
