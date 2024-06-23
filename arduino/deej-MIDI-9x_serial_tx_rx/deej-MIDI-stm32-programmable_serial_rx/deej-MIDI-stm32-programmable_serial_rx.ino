@@ -60,7 +60,7 @@ char tempCharsAux[MAX_AUX_LENGTH]; // temporary array for use when parsing
 // Adjusts linearity correction for my specific potentiometers.
 // 1 = fully linear but jittery. 0.7 is about max for no jitter.
 const float correctionMultiplier = 0.60;
-const uint8_t threshold = 32; // 32ish
+const uint8_t threshold = 44; // 32ish
 
 // measured output every equal 5mm increment in 12-bit. Minimum and maximum
 // values are not affected by correctionMultiplier.
