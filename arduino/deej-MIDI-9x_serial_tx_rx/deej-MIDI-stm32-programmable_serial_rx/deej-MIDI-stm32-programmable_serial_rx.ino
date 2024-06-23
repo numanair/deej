@@ -86,10 +86,10 @@ int analogSliderValues[NUM_TOTAL_SLIDERS];
 bool prog_end = 0;
 bool CC_CH_mode = 1;
 // const int MAX_MESSAGE_LENGTH = NUM_TOTAL_SLIDERS * 6;  // sliders * 00:00,
-int addressWriteCC = 2;
-int addressWriteChan = addressWriteCC + NUM_TOTAL_SLIDERS;
-int addressWriteUpperLimit = addressWriteChan + NUM_TOTAL_SLIDERS;
-int addressWriteLowerLimit = addressWriteUpperLimit + NUM_TOTAL_SLIDERS;
+const int addressWriteCC = 2;
+const int addressWriteChan = addressWriteCC + NUM_TOTAL_SLIDERS;
+const int addressWriteUpperLimit = addressWriteChan + NUM_TOTAL_SLIDERS;
+const int addressWriteLowerLimit = addressWriteUpperLimit + NUM_TOTAL_SLIDERS;
 
 // variables to hold the parsed data
 char messageFromPC[MAX_RECEIVE_LENGTH] = {0};
@@ -163,8 +163,9 @@ void setup() {
 
   delay(2000);
   // EEPROM setup:
-  const int addressFlag = 10;
-  if (EEPROM.read(addressFlag) == 200) {
+  const int addressFlag = addressWriteLowerLimit + NUM_TOTAL_SLIDERS;
+  const int addressData = 200;
+  if (EEPROM.read(addressFlag) == addressData) {
     // EEPROM already set. Reading.
     CompositeSerial.println("EEPROM already set. Reading");
     readFromEEPROM(addressWriteCC, cc_command, NUM_TOTAL_SLIDERS, 127); // CC
@@ -186,7 +187,7 @@ void setup() {
                   127); // Lower bound of each fader output
     writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_TOTAL_SLIDERS,
                   127);             // Upper bound of each fader output
-    EEPROM.write(addressFlag, 200); // mark EEPROM as set
+    EEPROM.write(addressFlag, addressData); // mark EEPROM as set
   }
 
   delay(800);
