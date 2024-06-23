@@ -25,7 +25,7 @@
 // https://github.com/jrullan/neotimer
 // https://github.com/RobTillaart/MultiMap
 
-const String firmwareVersion = "v1.1.0-rx";
+const String firmwareVersion = "v1.1.1-rx";
 
 // Number of potentiometers or faders
 const uint8_t NUM_SLIDERS = 6;     // Faders connected to primary board
