@@ -18,18 +18,18 @@
 const String firmwareVersion = "v1.2.0";
 
 // Number of potentiometers or faders
-const uint8_t NUM_SLIDERS = 5;
+const uint8_t NUM_SLIDERS = 4;
 
 // Potentiometer pins assignment
-const uint8_t analogInputs[NUM_SLIDERS] = {0, 1, 2, 3, 4};
+const uint8_t analogInputs[NUM_SLIDERS] = {0, 1, 2, 3};
 
-uint8_t midi_channel[NUM_SLIDERS] = {1, 1, 1, 1, 1};   // 1 through 16
-uint8_t cc_command[NUM_SLIDERS] = {1, 11, 7, 14, 21};  // MIDI CC number
+uint8_t midi_channel[NUM_SLIDERS] = {1, 1, 1, 1};   // 1 through 16
+uint8_t cc_command[NUM_SLIDERS] = {1, 11, 7, 14};  // MIDI CC number
 
 uint8_t cc_lower_limit[NUM_SLIDERS] = {
-    0, 0, 0, 0, 0};  // optionally limit range of MIDI CC per fader
+    0, 0, 0, 0};  // optionally limit range of MIDI CC per fader
 uint8_t cc_upper_limit[NUM_SLIDERS] = {
-    127, 127, 127, 127, 127};  // optionally limit range of MIDI CC per fader
+    127, 127, 127, 127};  // optionally limit range of MIDI CC per fader
 
 const byte MAX_RECEIVE_LENGTH = (NUM_SLIDERS * 3 - 1) * 2 + 1 + 6;
 char receivedChars[MAX_RECEIVE_LENGTH];
