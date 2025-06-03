@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.2.1
+
+- Increased fader threshold slightly
+
 ## v1.1.1
 
 - Internal status LED turns off after startup
