@@ -15,7 +15,7 @@
 // https://www.midi.org/specifications-old/item/table-3-control-change-messages-data-bytes-2
 // https://anotherproducer.com/online-tools-for-musicians/midi-cc-list/
 
-const String firmwareVersion = "v1.2.0";
+const String firmwareVersion = "v1.3.0";
 
 // Number of potentiometers or faders
 const uint8_t NUM_SLIDERS = 5;
@@ -25,11 +25,15 @@ const uint8_t analogInputs[NUM_SLIDERS] = {0, 1, 2, 3, 4};
 
 uint8_t midi_channel[NUM_SLIDERS] = {1, 1, 1, 1, 1};   // 1 through 16
 uint8_t cc_command[NUM_SLIDERS] = {1, 11, 7, 14, 21};  // MIDI CC number
+const uint8_t midi_channel_defaults[NUM_SLIDERS] = {1, 1, 1, 1, 1};   // 1 through 16
+const uint8_t cc_command_defaults[NUM_SLIDERS] = {1, 11, 7, 14, 21};  // MIDI CC number
 
 uint8_t cc_lower_limit[NUM_SLIDERS] = {
     0, 0, 0, 0, 0};  // optionally limit range of MIDI CC per fader
 uint8_t cc_upper_limit[NUM_SLIDERS] = {
     127, 127, 127, 127, 127};  // optionally limit range of MIDI CC per fader
+const uint8_t cc_lower_limit_default[NUM_SLIDERS] = {0, 0, 0, 0, 0};
+const uint8_t cc_upper_limit_default[NUM_SLIDERS] = {127, 127, 127, 127, 127};
 
 const byte MAX_RECEIVE_LENGTH = (NUM_SLIDERS * 3 - 1) * 2 + 1 + 6;
 char receivedChars[MAX_RECEIVE_LENGTH];
@@ -40,6 +44,7 @@ char messageFromPC[MAX_RECEIVE_LENGTH] = {0};
 int integerFromPC = 0;
 
 bool newData = false;
+bool isFirstReset = true;
 
 // Adjusts linearity correction for my specific potentiometers.
 // 1 = fully linear but affects resolution. 0.7 is about max for no impact.
@@ -79,6 +84,7 @@ int addressWriteLowerLimit = addressWriteUpperLimit + NUM_SLIDERS;
 Neotimer mytimer = Neotimer(1);     // ms ADC polling interval
 Neotimer deejtimer = Neotimer(10);  // ms send deej
 Neotimer mytimer2 = Neotimer(2000);
+Neotimer resetCancel = Neotimer(5000); // timeout for second reset command
 // ms delay before saving settings/resuming Deej output.
 // Also prevents rapid EEPROM writes.
 
@@ -116,6 +122,8 @@ void setup() {
   pinMode(PC13, OUTPUT);
   digitalWrite(PC13, LOW);  // Turn on LED during boot
   mytimer2.start();
+
+  resetCancel.start();
 
   myADC.calibrate();
 
@@ -264,6 +272,7 @@ void recvWithStartEndMarkers() {
   char togDeej = 'd';        // toggle Deej
   char togLimitsEdit = 'm';  // toggle adjusting output limits min/max
   char helpMode = 'h';       // help
+  char reset = 'r';       // reset
   char rc;
 
   while (CompositeSerial.available() > 0 && newData == false) {
@@ -312,7 +321,8 @@ void recvWithStartEndMarkers() {
       } else {
         CompositeSerial.println("Limits Min/Max Assignment Mode");
       }
-    } else if (rc == togDeej) {
+    }
+    else if (rc == togDeej) {
       if (deej > 0) {
         deej = -1;  // disable deej serial output
         CompositeSerial.println("Deej disabled.");
@@ -320,7 +330,8 @@ void recvWithStartEndMarkers() {
         deej = 1;  // re-enable deej serial output
         CompositeSerial.println("Deej enabled.");
       }
-    } else if (rc == helpMode) {
+    }
+    else if (rc == helpMode) {
       deej = -1;                    // disable deej
       CompositeSerial.print('\n');  // newline
       CompositeSerial.println("MIX5R Pro Help:");
@@ -338,6 +349,36 @@ void recvWithStartEndMarkers() {
       CompositeSerial.println("depending on the mode.");
       CompositeSerial.println("The default limits are 0-127 and can ");
       CompositeSerial.println("be swapped to reverse the output.");
+    }
+    else if (rc == reset) {
+      if (resetCancel.done()) {
+        isFirstReset = true;
+      }
+      if (isFirstReset) {
+        // print reset message and wait for next reset
+        // CompositeSerial.println("Position faders in lowest position and") // TODO: auto NUM_SLIDERS
+        CompositeSerial.println("Send 'r' again to reset to defaults.");
+        isFirstReset = false;
+        resetCancel.start();
+      }
+      else {
+        // Reset to defaults
+        for (int i = 0; i < NUM_SLIDERS; i++) {
+          midi_channel[i] = midi_channel_defaults[i];
+          cc_command[i] = cc_command_defaults[i];
+          cc_lower_limit[i] = cc_lower_limit_default[i];
+          cc_upper_limit[i] = cc_upper_limit_default[i];
+        }
+        writeToEEPROM(addressWriteCC, cc_command, NUM_SLIDERS, 127);
+        writeToEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS, 16);
+        writeToEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_SLIDERS, 127);
+        writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_SLIDERS, 127);
+        CompositeSerial.println("MIDI settings reset");
+        isFirstReset = true;
+      }
+    }
+    if (rc != reset){
+      isFirstReset = true; // clear first 'r' sent
     }
   }
 }
