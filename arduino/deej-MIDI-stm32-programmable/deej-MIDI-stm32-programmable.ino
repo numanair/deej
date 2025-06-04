@@ -46,6 +46,7 @@ int integerFromPC = 0;
 
 bool newData = false;
 bool isFirstReset = true;
+bool isFirstDetect = true;
 
 // Adjusts linearity correction for my specific potentiometers.
 // 1 = fully linear but affects resolution. 0.7 is about max for no impact.
@@ -86,6 +87,7 @@ Neotimer mytimer = Neotimer(1);     // ms ADC polling interval
 Neotimer deejtimer = Neotimer(10);  // ms send deej
 Neotimer mytimer2 = Neotimer(2000);
 Neotimer resetCancel = Neotimer(5000); // timeout for second reset command
+Neotimer detectCancel = Neotimer(5000); // timeout for second 'F' command
 // ms delay before saving settings/resuming Deej output.
 // Also prevents rapid EEPROM writes.
 
@@ -129,6 +131,7 @@ void setup() {
   mytimer2.start();
 
   resetCancel.start();
+  detectCancel.start();
 
   myADC.calibrate();
 
@@ -374,6 +377,7 @@ void recvWithStartEndMarkers() {
       CompositeSerial.println("be swapped to reverse the output.");
     }
     else if (rc == reset) {
+      deej = -1;
       if (resetCancel.done()) {
         isFirstReset = true;
       }
@@ -403,10 +407,29 @@ void recvWithStartEndMarkers() {
       }
     }
     else if (rc == detectNum) {
-      detectFaders();
+      deej = -1;
+      if (detectCancel.done()) {
+        isFirstDetect = true;
+      }
+      if (isFirstDetect) {
+        // print reset message and wait for next 'F'
+        CompositeSerial.println("Position faders in lowest position and");
+        CompositeSerial.println("send 'F' again to detect number of faders.");
+        CompositeSerial.println("> Not recommended unless you know why! <");
+        isFirstDetect = false;
+        detectCancel.start();
+      }
+      else {
+        // second 'F', detect fader count
+        detectFaders();
+        isFirstDetect = true;
+      }
     }
-    if (rc != reset){
+    if (rc != reset) {
       isFirstReset = true; // clear first 'r' sent
+    }
+    if (rc != detectNum) {
+      isFirstDetect = true; // clear first 'F' sent
     }
   }
 }
