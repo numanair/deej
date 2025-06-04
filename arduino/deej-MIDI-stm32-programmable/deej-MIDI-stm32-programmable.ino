@@ -18,24 +18,24 @@
 const String firmwareVersion = "v1.4.0";
 
 // Number of potentiometers or faders
-const uint8_t NUM_SLIDERS = 8;
+const uint8_t NUM_INPUTS = 8; // ADC input available on MCU
 uint8_t NUM_SLIDERS_ACTIVE = 5; // dynamic fader count
 
 // Potentiometer pins assignment
-const uint8_t analogInputs[NUM_SLIDERS] = {0, 1, 2, 3, 4, 5, 6, 7};
+const uint8_t analogInputs[NUM_INPUTS] = {0, 1, 2, 3, 4, 5, 6, 7};
 
-uint8_t midi_channel[NUM_SLIDERS] = {1, 1, 1, 1, 1, 1, 1, 1};   // 1 through 16
-uint8_t cc_command[NUM_SLIDERS] = {1, 11, 7, 14, 21, 22, 23, 24};  // MIDI CC number
-const uint8_t midi_channel_defaults[NUM_SLIDERS] = {1, 1, 1, 1, 1, 1, 1, 1};   // 1 through 16
-const uint8_t cc_command_defaults[NUM_SLIDERS] = {1, 11, 7, 14, 21, 22, 23, 24};  // MIDI CC number
+uint8_t midi_channel[NUM_INPUTS] = {1, 1, 1, 1, 1, 1, 1, 1};   // 1 through 16
+uint8_t cc_command[NUM_INPUTS] = {1, 11, 7, 14, 21, 22, 23, 24};  // MIDI CC number
+const uint8_t midi_channel_defaults[NUM_INPUTS] = {1, 1, 1, 1, 1, 1, 1, 1};   // 1 through 16
+const uint8_t cc_command_defaults[NUM_INPUTS] = {1, 11, 7, 14, 21, 22, 23, 24};  // MIDI CC number
 
 // optionally limit range of MIDI output per fader. Can be used to invert or limit.
-uint8_t cc_lower_limit[NUM_SLIDERS] = {0};
-uint8_t cc_upper_limit[NUM_SLIDERS] = {127};
-const uint8_t cc_lower_limit_default[NUM_SLIDERS] = {0};
-const uint8_t cc_upper_limit_default[NUM_SLIDERS] = {127};
+uint8_t cc_lower_limit[NUM_INPUTS] = {0};
+uint8_t cc_upper_limit[NUM_INPUTS] = {127};
+const uint8_t cc_lower_limit_default[NUM_INPUTS] = {0};
+const uint8_t cc_upper_limit_default[NUM_INPUTS] = {127};
 
-const byte MAX_RECEIVE_LENGTH = (NUM_SLIDERS * 3 - 1) * 2 + 1 + 6;
+const byte MAX_RECEIVE_LENGTH = (NUM_INPUTS * 3 - 1) * 2 + 1 + 6;
 char receivedChars[MAX_RECEIVE_LENGTH];
 char tempChars[MAX_RECEIVE_LENGTH];  // temporary array for use when parsing
 
@@ -65,21 +65,21 @@ uint16_t idealOutputValues[arrayQty] = {0};
 // Note: 4095 = 2^12 - 1 (the maximum value that
 // can be represented by a 12-bit unsigned number
 
-int old_value[NUM_SLIDERS] = {0};
-int new_value[NUM_SLIDERS] = {0};
-int old_midi_value[NUM_SLIDERS] = {0};
-int new_midi_value[NUM_SLIDERS] = {0};
-int analogSliderValues[NUM_SLIDERS];
-const int MAX_MESSAGE_LENGTH = NUM_SLIDERS * 6;  // sliders * 00:00,
+int old_value[NUM_INPUTS] = {0};
+int new_value[NUM_INPUTS] = {0};
+int old_midi_value[NUM_INPUTS] = {0};
+int new_midi_value[NUM_INPUTS] = {0};
+int analogSliderValues[NUM_INPUTS];
+const int MAX_MESSAGE_LENGTH = NUM_INPUTS * 6;  // sliders * 00:00,
 bool prog_end = 0;
 bool CC_CH_mode = 1;
 int deej = 1;  // 1=enabled 0=paused -1=disabled
 const int addressFlag = 10;
 const int addressWriteCC = 20;
-const int addressWriteChan = addressWriteCC + NUM_SLIDERS;
-const int addressWriteUpperLimit = addressWriteChan + NUM_SLIDERS;
-const int addressWriteLowerLimit = addressWriteUpperLimit + NUM_SLIDERS;
-const int addressWriteFaderCt = addressWriteLowerLimit + NUM_SLIDERS;
+const int addressWriteChan = addressWriteCC + NUM_INPUTS;
+const int addressWriteUpperLimit = addressWriteChan + NUM_INPUTS;
+const int addressWriteLowerLimit = addressWriteUpperLimit + NUM_INPUTS;
+const int addressWriteFaderCt = addressWriteLowerLimit + NUM_INPUTS;
 
 Neotimer mytimer = Neotimer(1);     // ms ADC polling interval
 Neotimer deejtimer = Neotimer(10);  // ms send deej
@@ -109,11 +109,11 @@ STM32ADC myADC(ADC1);
 
 // Initialize ResponsiveAnalogRead object size
 // The actual settings are initialized later
-ResponsiveAnalogRead analog[NUM_SLIDERS];
+ResponsiveAnalogRead analog[NUM_INPUTS];
 
 void setup() {
   const int adc_bits = 12;
-  for (int i = 0; i < NUM_SLIDERS; i++) {
+  for (int i = 0; i < NUM_INPUTS; i++) {
     // ResponsiveAnalogRead settings
     // (pin, sleep, snapMultiplier)
     analog[i] = ResponsiveAnalogRead(analogInputs[i], true, .0001);
@@ -157,33 +157,33 @@ void setup() {
   midi.begin();
   CompositeSerial.begin(9600);
 
-  delay(1000);
+  delay(500);
   // EEPROM setup:
   const int magicNum = 204;
   if (EEPROM.read(addressFlag) == magicNum) {
     // EEPROM already set. Reading.
     CompositeSerial.println("EEPROM already set. Reading");
-    readFromEEPROM(addressWriteCC, cc_command, NUM_SLIDERS, 127);     // CC
-    readFromEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS, 16);  // Channel
-    readFromEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_SLIDERS,
+    readFromEEPROM(addressWriteCC, cc_command, NUM_INPUTS, 127);     // CC
+    readFromEEPROM(addressWriteChan, midi_channel, NUM_INPUTS, 16);  // Channel
+    readFromEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_INPUTS,
                    127);  // Lower bound of each fader output
-    readFromEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_SLIDERS,
+    readFromEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_INPUTS,
                    127);   // Upper bound of each fader output
     NUM_SLIDERS_ACTIVE = EEPROM.read(addressWriteFaderCt);
     // constrain to HW ADC inputs
-    if (NUM_SLIDERS_ACTIVE > NUM_SLIDERS || NUM_SLIDERS_ACTIVE < 1) {
-      NUM_SLIDERS_ACTIVE = NUM_SLIDERS;
+    if (NUM_SLIDERS_ACTIVE > NUM_INPUTS || NUM_SLIDERS_ACTIVE < 1) {
+      NUM_SLIDERS_ACTIVE = NUM_INPUTS;
     }
     printSettings();       // print settings to serial
     printLimitSettings();  // print settings to serial
   } else {
     // First run, set EEPROM data to defaults
     CompositeSerial.println("First run, set EEPROM data to defaults");
-    writeToEEPROM(addressWriteCC, cc_command, NUM_SLIDERS, 127);     // CC
-    writeToEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS, 16);  // Channel
-    writeToEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_SLIDERS,
+    writeToEEPROM(addressWriteCC, cc_command, NUM_INPUTS, 127);     // CC
+    writeToEEPROM(addressWriteChan, midi_channel, NUM_INPUTS, 16);  // Channel
+    writeToEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_INPUTS,
                   127);  // Lower bound of each fader output
-    writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_SLIDERS,
+    writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_INPUTS,
                   127);              // Upper bound of each fader output
     EEPROM.write(addressWriteFaderCt, NUM_SLIDERS_ACTIVE);              
     EEPROM.write(addressFlag, magicNum);  // mark EEPROM as set
@@ -204,10 +204,10 @@ void loop() {
       sendSliderValues();  // Deej Serial
     } else if (mytimer2.done()) {
       if (prog_end) {
-        writeToEEPROM(addressWriteCC, cc_command, NUM_SLIDERS, 127);
-        writeToEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS, 16);
-        writeToEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_SLIDERS, 127);
-        writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_SLIDERS, 127);
+        writeToEEPROM(addressWriteCC, cc_command, NUM_INPUTS, 127);
+        writeToEEPROM(addressWriteChan, midi_channel, NUM_INPUTS, 16);
+        writeToEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_INPUTS, 127);
+        writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_INPUTS, 127);
         CompositeSerial.println("MIDI settings saved");
         prog_end = 0;
         if (deej > 0) {
@@ -252,7 +252,7 @@ void loop() {
 }
 
 void writeToEEPROM(int addressRead, byte byteArray[], int arraySize, int max) {
-  for (int i = 0; i < NUM_SLIDERS; ++i) {
+  for (int i = 0; i < NUM_INPUTS; ++i) {
     if (byteArray[i] > max) {
       // Keeps CC/channel within limit
       byteArray[i] = max;
@@ -263,7 +263,7 @@ void writeToEEPROM(int addressRead, byte byteArray[], int arraySize, int max) {
 }
 
 void readFromEEPROM(int addressRead, byte byteArray[], int arraySize, int max) {
-  for (int i = 0; i < NUM_SLIDERS; ++i) {
+  for (int i = 0; i < NUM_INPUTS; ++i) {
     byteArray[i] = EEPROM.read(addressRead);
     if (byteArray[i] > max) {
       // Keeps CC/channel within limit
@@ -385,7 +385,7 @@ void recvWithStartEndMarkers() {
       }
       else {
         // Reset to defaults!
-        for (int i = 0; i < NUM_SLIDERS; i++) {
+        for (int i = 0; i < NUM_INPUTS; i++) {
           midi_channel[i] = midi_channel_defaults[i];
           cc_command[i] = cc_command_defaults[i];
           cc_lower_limit[i] = cc_lower_limit_default[i];
@@ -395,6 +395,10 @@ void recvWithStartEndMarkers() {
         writeToEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS, 16);
         writeToEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_SLIDERS, 127);
         writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_SLIDERS, 127);
+        writeToEEPROM(addressWriteCC, cc_command, NUM_INPUTS, 127);
+        writeToEEPROM(addressWriteChan, midi_channel, NUM_INPUTS, 16);
+        writeToEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_INPUTS, 127);
+        writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_INPUTS, 127);
         CompositeSerial.println(">>> MIDI settings reset! <<<");
         printSettings();
         printLimitSettings();
@@ -568,7 +572,7 @@ void filteredAnalog() {
 }
 
 void updateSliderValues(bool onlyActive = 1) {
-  uint reps = NUM_SLIDERS;
+  uint reps = NUM_INPUTS;
   if (onlyActive) {
     reps = NUM_SLIDERS_ACTIVE;
   }
@@ -613,7 +617,7 @@ void detectFaders() {
   updateSliderValues(0); // update inactive faders' positions
   if (analog[0].getRawValue() < cutoff) {  // first fader (1 minimum!)
     potentialCount++; // 1
-    for (int i = 1; i < NUM_SLIDERS - 1; i++) { // start at second fader
+    for (int i = 1; i < NUM_INPUTS - 1; i++) { // start at second fader
       // i > 0
       if (analog[i].getRawValue() < cutoff) {
         potentialCount++;
