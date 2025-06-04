@@ -119,7 +119,9 @@ void setup() {
     analog[i].enableEdgeSnap();
   }
   pinMode(PC13, OUTPUT);
+  pinMode(PB2, OUTPUT); // (Blue Pill Plus)
   digitalWrite(PC13, LOW);  // Turn on LED during boot
+  digitalWrite(PB2, LOW);  // Turn on LED during boot (BPP)
   mytimer2.start();
 
   resetCancel.start();
@@ -179,7 +181,8 @@ void setup() {
   }
 
   delay(500);
-  digitalWrite(PC13, HIGH);  // Turn off LED on Blue Pill boards
+  digitalWrite(PC13, HIGH);  // Turn off LED (Blue Pill boards)
+  digitalWrite(PB2, LOW);  // Turn off LED (Blue Pill Plus boards)
 }
 
 void loop() {
