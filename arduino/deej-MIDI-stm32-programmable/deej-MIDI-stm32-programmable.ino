@@ -29,11 +29,12 @@ uint8_t cc_command[NUM_INPUTS] = {1, 11, 7, 14, 21, 22, 23, 24};  // MIDI CC num
 const uint8_t midi_channel_defaults[NUM_INPUTS] = {1, 1, 1, 1, 1, 1, 1, 1};   // 1 through 16
 const uint8_t cc_command_defaults[NUM_INPUTS] = {1, 11, 7, 14, 21, 22, 23, 24};  // MIDI CC number
 
-// optionally limit range of MIDI output per fader. Can be used to invert or limit.
-uint8_t cc_lower_limit[NUM_INPUTS] = {0};
-uint8_t cc_upper_limit[NUM_INPUTS] = {127};
-const uint8_t cc_lower_limit_default[NUM_INPUTS] = {0};
-const uint8_t cc_upper_limit_default[NUM_INPUTS] = {127};
+// Optionally limit range of MIDI output per fader.
+// Can be used to invert or limit.
+uint8_t cc_lower_limit[NUM_INPUTS] = {0, 0, 0, 0, 0, 0, 0, 0};
+uint8_t cc_upper_limit[NUM_INPUTS] = {127, 127, 127, 127, 127, 127, 127, 127};
+const uint8_t cc_lower_limit_default[NUM_INPUTS] = {0, 0, 0, 0, 0, 0, 0, 0};
+const uint8_t cc_upper_limit_default[NUM_INPUTS] = {127, 127, 127, 127,127, 127, 127, 127};
 
 const byte MAX_RECEIVE_LENGTH = (NUM_INPUTS * 3 - 1) * 2 + 1 + 6;
 char receivedChars[MAX_RECEIVE_LENGTH];
