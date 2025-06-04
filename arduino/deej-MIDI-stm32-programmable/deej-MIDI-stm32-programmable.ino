@@ -392,10 +392,6 @@ void recvWithStartEndMarkers() {
           cc_lower_limit[i] = cc_lower_limit_default[i];
           cc_upper_limit[i] = cc_upper_limit_default[i];
         }
-        writeToEEPROM(addressWriteCC, cc_command, NUM_SLIDERS, 127);
-        writeToEEPROM(addressWriteChan, midi_channel, NUM_SLIDERS, 16);
-        writeToEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_SLIDERS, 127);
-        writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_SLIDERS, 127);
         writeToEEPROM(addressWriteCC, cc_command, NUM_INPUTS, 127);
         writeToEEPROM(addressWriteChan, midi_channel, NUM_INPUTS, 16);
         writeToEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_INPUTS, 127);
