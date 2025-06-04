@@ -155,8 +155,8 @@ void setup() {
 
   delay(1000);
   // EEPROM setup:
-  const int addressFlag = 10;
-  if (EEPROM.read(addressFlag) == 200) {
+  const int magicNum = 204;
+  if (EEPROM.read(addressFlag) == magicNum) {
     // EEPROM already set. Reading.
     CompositeSerial.println("EEPROM already set. Reading");
     readFromEEPROM(addressWriteCC, cc_command, NUM_SLIDERS, 127);     // CC
@@ -176,7 +176,7 @@ void setup() {
                   127);  // Lower bound of each fader output
     writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_SLIDERS,
                   127);              // Upper bound of each fader output
-    EEPROM.write(addressFlag, 200);  // mark EEPROM as set
+    EEPROM.write(addressFlag, magicNum);  // mark EEPROM as set
   }
 
   delay(500);
