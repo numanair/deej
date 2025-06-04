@@ -48,13 +48,11 @@ bool isFirstReset = true;
 
 // Adjusts linearity correction for my specific potentiometers.
 // 1 = fully linear but affects resolution. 0.7 is about max for no impact.
-// const float correctionMultiplier = 0.0;
 const float correctionMultiplier = 0.60;  // good balance
-// const float correctionMultiplier = 1.00;
 const uint8_t threshold = 36;  // 32ish min. 36 recommended
 
-// measured output every equal 5mm increment in 12-bit. Minimum and maximum
-// values are not affected by correctionMultiplier.
+// measured output every equal 5mm increment in 12-bit.
+// minimum and maximum values are not affected by correctionMultiplier.
 const uint16_t measuredInput[] = {19,   50,   165,  413,  907,  1450, 1975,
                                   2545, 3095, 3645, 3923, 4030, 4082};
 
@@ -64,7 +62,7 @@ uint16_t adjustedInputVal[arrayQty] = {0};  // Same type as measuredInput
 
 // Probably no need to change these calculated values
 uint16_t idealOutputValues[arrayQty] = {0};
-// Note: 4095 = 2^12 - 1 (the maximum value that 
+// Note: 4095 = 2^12 - 1 (the maximum value that
 // can be represented by a 12-bit unsigned number
 
 int old_value[NUM_SLIDERS] = {0};
