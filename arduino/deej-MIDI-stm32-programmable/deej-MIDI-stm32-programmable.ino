@@ -273,6 +273,7 @@ void recvWithStartEndMarkers() {
   char togDeej       = 'd';  // toggle Deej
   char togLimitsEdit = 'm';  // toggle adjusting output limits min/max
   char helpMode      = 'h';  // help
+  char reset         = 'r';  // reset
   char rc;
 
   while (CompositeSerial.available() > 0 && newData == false) {
