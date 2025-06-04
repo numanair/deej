@@ -15,25 +15,25 @@
 // https://www.midi.org/specifications-old/item/table-3-control-change-messages-data-bytes-2
 // https://anotherproducer.com/online-tools-for-musicians/midi-cc-list/
 
-const String firmwareVersion = "v1.3.1";
+const String firmwareVersion = "v1.4.0";
 
 // Number of potentiometers or faders
-const uint8_t NUM_SLIDERS = 5;
+const uint8_t NUM_SLIDERS = 8;
+uint8_t NUM_SLIDERS_ACTIVE = 5; // dynamic fader count
 
 // Potentiometer pins assignment
-const uint8_t analogInputs[NUM_SLIDERS] = {0, 1, 2, 3, 4};
+const uint8_t analogInputs[NUM_SLIDERS] = {0, 1, 2, 3, 4, 5, 6, 7};
 
-uint8_t midi_channel[NUM_SLIDERS] = {1, 1, 1, 1, 1};   // 1 through 16
-uint8_t cc_command[NUM_SLIDERS] = {1, 11, 7, 14, 21};  // MIDI CC number
-const uint8_t midi_channel_defaults[NUM_SLIDERS] = {1, 1, 1, 1, 1};   // 1 through 16
-const uint8_t cc_command_defaults[NUM_SLIDERS] = {1, 11, 7, 14, 21};  // MIDI CC number
+uint8_t midi_channel[NUM_SLIDERS] = {1, 1, 1, 1, 1, 1, 1, 1};   // 1 through 16
+uint8_t cc_command[NUM_SLIDERS] = {1, 11, 7, 14, 21, 22, 23, 24};  // MIDI CC number
+const uint8_t midi_channel_defaults[NUM_SLIDERS] = {1, 1, 1, 1, 1, 1, 1, 1};   // 1 through 16
+const uint8_t cc_command_defaults[NUM_SLIDERS] = {1, 11, 7, 14, 21, 22, 23, 24};  // MIDI CC number
 
-uint8_t cc_lower_limit[NUM_SLIDERS] = {
-    0, 0, 0, 0, 0};  // optionally limit range of MIDI CC per fader
-uint8_t cc_upper_limit[NUM_SLIDERS] = {
-    127, 127, 127, 127, 127};  // optionally limit range of MIDI CC per fader
-const uint8_t cc_lower_limit_default[NUM_SLIDERS] = {0, 0, 0, 0, 0};
-const uint8_t cc_upper_limit_default[NUM_SLIDERS] = {127, 127, 127, 127, 127};
+// optionally limit range of MIDI output per fader. Can be used to invert or limit.
+uint8_t cc_lower_limit[NUM_SLIDERS] = {0};
+uint8_t cc_upper_limit[NUM_SLIDERS] = {127};
+const uint8_t cc_lower_limit_default[NUM_SLIDERS] = {0};
+const uint8_t cc_upper_limit_default[NUM_SLIDERS] = {127};
 
 const byte MAX_RECEIVE_LENGTH = (NUM_SLIDERS * 3 - 1) * 2 + 1 + 6;
 char receivedChars[MAX_RECEIVE_LENGTH];
@@ -79,6 +79,7 @@ const int addressWriteCC = 20;
 const int addressWriteChan = addressWriteCC + NUM_SLIDERS;
 const int addressWriteUpperLimit = addressWriteChan + NUM_SLIDERS;
 const int addressWriteLowerLimit = addressWriteUpperLimit + NUM_SLIDERS;
+const int addressWriteFaderCt = addressWriteLowerLimit + NUM_SLIDERS;
 
 Neotimer mytimer = Neotimer(1);     // ms ADC polling interval
 Neotimer deejtimer = Neotimer(10);  // ms send deej
@@ -92,14 +93,17 @@ USBMIDI midi;
 USBCompositeSerial CompositeSerial;
 
 void sendSliderValues();
-void updateSliderValues();
+void updateSliderValues(bool);
 void filteredAnalog();
 void parseData();
 void recvWithStartEndMarkers();
 void printArray();
-void printSettings();
-void printLimitSettings();
+void printSettings(bool plain = 0);
+void printLimitSettings(bool plain = 0);
+void writeToEEPROM(int, byte[], int, int);
+void readFromEEPROM(int, byte[], int, int);
 void parseFaderLimits();
+void detectFaders();
 
 STM32ADC myADC(ADC1);
 
@@ -165,6 +169,11 @@ void setup() {
                    127);  // Lower bound of each fader output
     readFromEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_SLIDERS,
                    127);   // Upper bound of each fader output
+    NUM_SLIDERS_ACTIVE = EEPROM.read(addressWriteFaderCt);
+    // constrain to HW ADC inputs
+    if (NUM_SLIDERS_ACTIVE > NUM_SLIDERS || NUM_SLIDERS_ACTIVE < 1) {
+      NUM_SLIDERS_ACTIVE = NUM_SLIDERS;
+    }
     printSettings();       // print settings to serial
     printLimitSettings();  // print settings to serial
   } else {
@@ -176,6 +185,7 @@ void setup() {
                   127);  // Lower bound of each fader output
     writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_SLIDERS,
                   127);              // Upper bound of each fader output
+    EEPROM.write(addressWriteFaderCt, NUM_SLIDERS_ACTIVE);              
     EEPROM.write(addressFlag, magicNum);  // mark EEPROM as set
   }
 
@@ -187,7 +197,7 @@ void setup() {
 void loop() {
   // Deej loop and MIDI values and sending every 10ms
   if (mytimer.repeat()) {
-    updateSliderValues();  // Gets new slider values
+    updateSliderValues(1);  // Gets new (active) slider values
     filteredAnalog();      // MIDI
 
     if (deej > 0 && deejtimer.repeat()) {
@@ -274,6 +284,7 @@ void recvWithStartEndMarkers() {
   char togLimitsEdit = 'm';  // toggle adjusting output limits min/max
   char helpMode      = 'h';  // help
   char reset         = 'r';  // reset
+  char detectNum     = 'F';  // count faders
   char rc;
 
   while (CompositeSerial.available() > 0 && newData == false) {
@@ -343,11 +354,20 @@ void recvWithStartEndMarkers() {
       CompositeSerial.println("c - Print current settings");
       CompositeSerial.println("d - Toggle Deej serial output temporarily");
       CompositeSerial.println("r - Reset settings to default (send twice)");
+      CompositeSerial.println("F - (Advanced) Redetect faders");
       CompositeSerial.print('\n');  // newline
+
       CompositeSerial.println(
-          "Settings are assigned in this format: <1,11,7,14,21:1,1,1,1,1>");
+          "Settings are assigned in this format:");
+      CompositeSerial.print("   ");
+      printSettings(1);
+      CompositeSerial.print("   ");
+      printLimitSettings(1);
+
       CompositeSerial.println(
-          "and correspond to <CC:Channel> or <lower_limit:upper_limit> ");
+        "and correspond to <CC:Channel>");
+      CompositeSerial.println(
+           "or <lower_limit:upper_limit> ");
       CompositeSerial.println("depending on the mode.");
       CompositeSerial.println("The default limits are 0-127 and can ");
       CompositeSerial.println("be swapped to reverse the output.");
@@ -381,6 +401,9 @@ void recvWithStartEndMarkers() {
         isFirstReset = true;
       }
     }
+    else if (rc == detectNum) {
+      detectFaders();
+    }
     if (rc != reset){
       isFirstReset = true; // clear first 'r' sent
     }
@@ -408,7 +431,7 @@ void parseData() {
   strcpy(stringCHAN, strtokIndx1);
 
   // Start CC code
-  for (int i = 0; i < NUM_SLIDERS; i++) {
+  for (int i = 0; i < NUM_SLIDERS_ACTIVE; i++) {
     if (i == 0) {
       strtokIndx2 = strtok(stringCC, ",");
     } else if (strtokIndx1 != NULL) {
@@ -419,10 +442,10 @@ void parseData() {
   }
   // End CC code
 
-  stringCHAN[NUM_SLIDERS * 3] = '\0';  // NULL terminate
+  stringCHAN[NUM_SLIDERS_ACTIVE * 3] = '\0';  // NULL terminate
 
   // Start Channel code
-  for (int i = 0; i < NUM_SLIDERS; i++) {
+  for (int i = 0; i < NUM_SLIDERS_ACTIVE; i++) {
     if (i == 0) {
       strtokIndx2 = strtok(stringCHAN, ",");
     } else if (strtokIndx2 != NULL) {
@@ -451,7 +474,7 @@ void parseFaderLimits() {
   strcpy(stringUpperLim, strtokIndx1);
 
   // Start new lower limit code
-  for (int i = 0; i < NUM_SLIDERS; i++) {
+  for (int i = 0; i < NUM_SLIDERS_ACTIVE; i++) {
     if (i == 0) {
       strtokIndx2 = strtok(stringLowerLim, ",");
     } else if (strtokIndx1 != NULL) {
@@ -463,7 +486,7 @@ void parseFaderLimits() {
   // End new lower limit code
 
   // Start new upper limit code
-  for (int i = 0; i < NUM_SLIDERS; i++) {
+  for (int i = 0; i < NUM_SLIDERS_ACTIVE; i++) {
     if (i == 0) {
       strtokIndx2 = strtok(stringUpperLim, ",");
     } else if (strtokIndx2 != NULL) {
@@ -485,28 +508,32 @@ void printArray(byte inputArray[], int arraySize) {
   }
 }
 
-void printSettings() {
-  CompositeSerial.println("MIDI CC & Chanel Assignment");
+void printSettings(bool plain) { // bool plain = 0
+  if (!plain) {
+    CompositeSerial.println("MIDI CC & Channel Assignment");
+  }
   CompositeSerial.print("<");
-  printArray(cc_command, NUM_SLIDERS);
+  printArray(cc_command, NUM_SLIDERS_ACTIVE);
   CompositeSerial.print(":");
-  printArray(midi_channel, NUM_SLIDERS);
+  printArray(midi_channel, NUM_SLIDERS_ACTIVE);
   CompositeSerial.print(">");
   CompositeSerial.print('\n');  // newline
 }
 
-void printLimitSettings() {
-  CompositeSerial.println("MIDI Limits Min/Max");
+void printLimitSettings(bool plain) { // bool plain = 0
+  if (!plain) {
+    CompositeSerial.println("MIDI Limits Min/Max");
+  }
   CompositeSerial.print("<");
-  printArray(cc_lower_limit, NUM_SLIDERS);
+  printArray(cc_lower_limit, NUM_SLIDERS_ACTIVE);
   CompositeSerial.print(":");
-  printArray(cc_upper_limit, NUM_SLIDERS);
+  printArray(cc_upper_limit, NUM_SLIDERS_ACTIVE);
   CompositeSerial.print(">");
   CompositeSerial.print('\n');  // newline
 }
 
 void filteredAnalog() {
-  for (int i = 0; i < NUM_SLIDERS; i++) {
+  for (int i = 0; i < NUM_SLIDERS_ACTIVE; i++) {
     if (analog[i].hasChanged()) {
       uint adaptiveval = analogSliderValues[i];
 
@@ -540,8 +567,12 @@ void filteredAnalog() {
   }
 }
 
-void updateSliderValues() {
-  for (int i = 0; i < NUM_SLIDERS; i++) {
+void updateSliderValues(bool onlyActive = 1) {
+  uint reps = NUM_SLIDERS;
+  if (onlyActive) {
+    reps = NUM_SLIDERS_ACTIVE;
+  }
+  for (int i = 0; i < reps; i++) {
     analog[i].update();  // ResponsiveAnalogRead
     analogSliderValues[i] = analog[i].getValue();
   }
@@ -550,7 +581,7 @@ void updateSliderValues() {
 // Deej Serial Support
 void sendSliderValues() {
   String builtString = String("");
-  for (int i = 0; i < NUM_SLIDERS; i++) {
+  for (int i = 0; i < NUM_SLIDERS_ACTIVE; i++) {
     // User set limits = 0-127.
     uint minVal10bit =
         cc_lower_limit[i] * (1023.0 / 127.0);  // decimals for float math
@@ -564,9 +595,38 @@ void sendSliderValues() {
                      idealOutputValues[arrayQty - 1], minVal10bit, maxVal10bit);
     constrain(limitedVal, 0, 1023);
     builtString += String((int)limitedVal);
-    if (i < NUM_SLIDERS - 1) {
+    if (i < NUM_SLIDERS_ACTIVE - 1) {
       builtString += String("|");
     }
   }
   CompositeSerial.println(builtString);
+}
+
+void detectFaders() {
+  // detects NUM_SLIDERS_ACTIVE automatically
+  // ADC inputs float around 400-600 usually
+  // move faders to hw 0 and count
+  const int cutoff = 100; // faders should be positioned below this point
+  uint potentialCount = 0;
+  // NUM_SLIDERS_ACTIVE = 0;
+
+  updateSliderValues(0); // update inactive faders' positions
+  if (analog[0].getRawValue() < cutoff) {  // first fader (1 minimum!)
+    potentialCount++; // 1
+    for (int i = 1; i < NUM_SLIDERS - 1; i++) { // start at second fader
+      // i > 0
+      if (analog[i].getRawValue() < cutoff) {
+        potentialCount++;
+      }
+      else {
+        // end detection
+        NUM_SLIDERS_ACTIVE = potentialCount;
+        EEPROM.write(addressWriteFaderCt, NUM_SLIDERS_ACTIVE);
+        break;
+      }
+    }
+  }
+  else {
+    CompositeSerial.println("Error: Please ensure all faders are in the lowest position");
+  }
 }
