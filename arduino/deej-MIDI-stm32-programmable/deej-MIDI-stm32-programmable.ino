@@ -74,10 +74,11 @@ const int MAX_MESSAGE_LENGTH = NUM_SLIDERS * 6;  // sliders * 00:00,
 bool prog_end = 0;
 bool CC_CH_mode = 1;
 int deej = 1;  // 1=enabled 0=paused -1=disabled
-int addressWriteCC = 20;
-int addressWriteChan = addressWriteCC + NUM_SLIDERS;
-int addressWriteUpperLimit = addressWriteChan + NUM_SLIDERS;
-int addressWriteLowerLimit = addressWriteUpperLimit + NUM_SLIDERS;
+const int addressFlag = 10;
+const int addressWriteCC = 20;
+const int addressWriteChan = addressWriteCC + NUM_SLIDERS;
+const int addressWriteUpperLimit = addressWriteChan + NUM_SLIDERS;
+const int addressWriteLowerLimit = addressWriteUpperLimit + NUM_SLIDERS;
 
 Neotimer mytimer = Neotimer(1);     // ms ADC polling interval
 Neotimer deejtimer = Neotimer(10);  // ms send deej
