@@ -87,9 +87,9 @@ const int addressWriteFaderCt = addressWriteLowerLimit + NUM_INPUTS;
 
 Neotimer mytimer = Neotimer(1);     // ms ADC polling interval
 Neotimer deejtimer = Neotimer(10);  // ms send deej
-Neotimer mytimer2 = Neotimer(2000);
-Neotimer resetCancel = Neotimer(5000); // timeout for second reset command
-Neotimer detectCancel = Neotimer(5000); // timeout for second 'F' command
+Neotimer writedelaytimer = Neotimer(2000); // delay saving to EEPROM in some scenerios
+Neotimer timeoutreset = Neotimer(8000); // timeout for second reset command
+Neotimer timeoutdetectfaders = Neotimer(5000); // timeout for second 'F' command
 // ms delay before saving settings/resuming Deej output.
 // Also prevents rapid EEPROM writes.
 
@@ -109,6 +109,8 @@ void writeToEEPROM(int, byte[], int, int);
 void readFromEEPROM(int, byte[], int, int);
 void parseFaderLimits();
 void detectFaders();
+void resetSettings();
+void writeAllSettings();
 
 STM32ADC myADC(ADC1);
 
@@ -130,10 +132,10 @@ void setup() {
   pinMode(PB2, OUTPUT); // (Blue Pill Plus)
   digitalWrite(PC13, LOW);  // Turn on LED during boot
   digitalWrite(PB2, LOW);  // Turn on LED during boot (BPP)
-  mytimer2.start();
+  writedelaytimer.start();
 
-  resetCancel.start();
-  detectCancel.start();
+  timeoutreset.start();
+  timeoutdetectfaders.start();
 
   myADC.calibrate();
 
@@ -183,25 +185,11 @@ void setup() {
     printSettings();       // print settings to serial
     printLimitSettings();  // print settings to serial
   } else {
-    // First run, set EEPROM data to defaults
-
-  // TODO: deduplicate reset functions
-  // populate midi_channel, etc with default values
-  for (int i = 0; i < NUM_INPUTS; ++i) {
-    midi_channel[i] = midi_channel_defaults[i];
-    cc_command[i] = cc_command_defaults[i];
-    cc_lower_limit[i] = cc_lower_limit_default[i];
-    cc_upper_limit[i] = cc_upper_limit_default[i];
-  }
-
-    CompositeSerial.println("First run, set EEPROM data to defaults");
-    writeToEEPROM(addressWriteCC, cc_command, NUM_INPUTS, 127);     // CC
-    writeToEEPROM(addressWriteChan, midi_channel, NUM_INPUTS, 16);  // Channel
-    writeToEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_INPUTS,
-                  127);  // Lower bound of each fader output
-    writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_INPUTS,
-                  127);              // Upper bound of each fader output
-    EEPROM.write(addressWriteFaderCt, NUM_SLIDERS_ACTIVE);              
+    // First run, set EEPROM data to defaults and
+    // populate midi_channel, etc with default values
+    resetSettings();
+    // write settings not set by the reset
+    EEPROM.write(addressWriteFaderCt, NUM_SLIDERS_ACTIVE); // number of faders active/enabled
     EEPROM.write(addressFlag, magicNum);  // mark EEPROM as set
   }
 
@@ -218,12 +206,9 @@ void loop() {
 
     if (deej > 0 && deejtimer.repeat()) {
       sendSliderValues();  // Deej Serial
-    } else if (mytimer2.done()) {
+    } else if (writedelaytimer.done()) {
       if (prog_end) {
-        writeToEEPROM(addressWriteCC, cc_command, NUM_INPUTS, 127);
-        writeToEEPROM(addressWriteChan, midi_channel, NUM_INPUTS, 16);
-        writeToEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_INPUTS, 127);
-        writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_INPUTS, 127);
+        writeAllSettings();
         CompositeSerial.println("MIDI settings saved");
         prog_end = 0;
         if (deej > 0) {
@@ -255,8 +240,8 @@ void loop() {
     if (deej >= 0) {
       deej = 0;
     }
-    mytimer2.reset();
-    mytimer2.start();
+    writedelaytimer.reset();
+    writedelaytimer.start();
 
     prog_end = 1;
     newData = false;
@@ -390,7 +375,7 @@ void recvWithStartEndMarkers() {
     }
     else if (rc == reset) {
       deej = -1;
-      if (resetCancel.done()) {
+      if (timeoutreset.done()) {
         isFirstReset = true;
       }
       if (isFirstReset) {
@@ -398,20 +383,11 @@ void recvWithStartEndMarkers() {
         // CompositeSerial.println("Position faders in lowest position and"); // TODO: auto NUM_SLIDERS
         CompositeSerial.println("Send 'r' again to reset to defaults.");
         isFirstReset = false;
-        resetCancel.start();
+        timeoutreset.start();
       }
       else {
-        // Reset to defaults!
-        for (int i = 0; i < NUM_INPUTS; i++) {
-          midi_channel[i] = midi_channel_defaults[i];
-          cc_command[i] = cc_command_defaults[i];
-          cc_lower_limit[i] = cc_lower_limit_default[i];
-          cc_upper_limit[i] = cc_upper_limit_default[i];
-        }
-        writeToEEPROM(addressWriteCC, cc_command, NUM_INPUTS, 127);
-        writeToEEPROM(addressWriteChan, midi_channel, NUM_INPUTS, 16);
-        writeToEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_INPUTS, 127);
-        writeToEEPROM(addressWriteUpperLimit, cc_upper_limit, NUM_INPUTS, 127);
+        // (User initiated) Reset to defaults!
+        resetSettings();
         CompositeSerial.println(">>> MIDI settings reset! <<<");
         printSettings();
         printLimitSettings();
@@ -420,7 +396,7 @@ void recvWithStartEndMarkers() {
     }
     else if (rc == detectNum) {
       deej = -1;
-      if (detectCancel.done()) {
+      if (timeoutdetectfaders.done()) {
         isFirstDetect = true;
       }
       if (isFirstDetect) {
@@ -429,7 +405,7 @@ void recvWithStartEndMarkers() {
         CompositeSerial.println("send 'F' again to detect number of faders.");
         CompositeSerial.println("> Not recommended unless you know why! <");
         isFirstDetect = false;
-        detectCancel.start();
+        timeoutdetectfaders.start();
       }
       else {
         // second 'F', detect fader count
@@ -672,4 +648,25 @@ void detectFaders() {
   }
   CompositeSerial.print(" active");
   CompositeSerial.print('\n');
+}
+
+void resetSettings() {
+  // reset EEPROM to defaults
+  CompositeSerial.println("First run, set EEPROM data to defaults");
+  for (int i = 0; i < NUM_INPUTS; ++i) {
+    midi_channel[i] = midi_channel_defaults[i];
+    cc_command[i] = cc_command_defaults[i];
+    cc_lower_limit[i] = cc_lower_limit_default[i];
+    cc_upper_limit[i] = cc_upper_limit_default[i];
+  }
+  writeAllSettings();
+}
+
+void writeAllSettings() {
+  writeToEEPROM(addressWriteCC, cc_command, NUM_INPUTS, 127);     // CC
+  writeToEEPROM(addressWriteChan, midi_channel, NUM_INPUTS, 16);  // Channel
+  writeToEEPROM(addressWriteLowerLimit, cc_lower_limit,
+                NUM_INPUTS, 127);  // Lower bound of each fader output
+  writeToEEPROM(addressWriteUpperLimit, cc_upper_limit,
+                NUM_INPUTS, 127);  // Upper bound of each fader output
 }
