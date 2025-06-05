@@ -419,6 +419,9 @@ void recvWithStartEndMarkers() {
     if (rc != detectNum) {
       isFirstDetect = true; // clear first 'F' sent
     }
+    if (rc != togDeej) {
+      deej = -1;
+    }
   }
 }
 
