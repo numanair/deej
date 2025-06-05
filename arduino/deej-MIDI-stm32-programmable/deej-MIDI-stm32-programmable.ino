@@ -652,7 +652,7 @@ void detectFaders() {
   }
   CompositeSerial.print(NUM_SLIDERS_ACTIVE);
   CompositeSerial.print(" Fader");
-  if (NUM_SLIDERS_ACTIVE > 2) {
+  if (NUM_SLIDERS_ACTIVE > 1) {
     CompositeSerial.print("s");
   }
   CompositeSerial.print(" active");
