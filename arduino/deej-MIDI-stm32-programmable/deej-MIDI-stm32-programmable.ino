@@ -111,6 +111,7 @@ void parseFaderLimits();
 void detectFaders();
 void resetSettings();
 void writeAllSettings();
+void printhelp();
 
 STM32ADC myADC(ADC1);
 
@@ -387,6 +388,10 @@ void recvWithStartEndMarkers() {
         detectFaders();
         isFirstDetect = true;
       }
+    }
+    else if (rc != togDeej) {
+      deej = -1; // any serial input turns off deej
+      printhelp(); // print help/info to serial
     }
     if (rc != reset) {
       isFirstReset = true; // clear first 'r' sent
