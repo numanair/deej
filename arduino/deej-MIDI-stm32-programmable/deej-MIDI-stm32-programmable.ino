@@ -346,32 +346,7 @@ void recvWithStartEndMarkers() {
     }
     else if (rc == helpMode) {
       deej = -1;                    // disable deej
-      CompositeSerial.print('\n');  // newline
-      CompositeSerial.println("MIX5R Pro Help:");
-      CompositeSerial.println("h - This help menu");
-      CompositeSerial.println("v - Print current firmware version");
-      CompositeSerial.println(
-          "m - toggle assigning MIDI CC/Channel or setting output min/max");
-      CompositeSerial.println("c - Print current settings");
-      CompositeSerial.println("d - Toggle Deej serial output temporarily");
-      CompositeSerial.println("r - Reset settings to default (send twice)");
-      CompositeSerial.println("F - (Advanced) Redetect faders");
-      CompositeSerial.print('\n');  // newline
-
-      CompositeSerial.println(
-          "Settings are assigned in this format:");
-      CompositeSerial.print("   ");
-      printSettings(1);
-      CompositeSerial.print("   ");
-      printLimitSettings(1);
-
-      CompositeSerial.println(
-        "and correspond to <CC:Channel>");
-      CompositeSerial.println(
-           "or <lower_limit:upper_limit> ");
-      CompositeSerial.println("depending on the mode.");
-      CompositeSerial.println("The default limits are 0-127 and can ");
-      CompositeSerial.println("be swapped to reverse the output.");
+      printhelp(); // print help/info to serial
     }
     else if (rc == reset) {
       deej = -1;
@@ -419,10 +394,36 @@ void recvWithStartEndMarkers() {
     if (rc != detectNum) {
       isFirstDetect = true; // clear first 'F' sent
     }
-    if (rc != togDeej) {
-      deej = -1;
-    }
   }
+}
+
+void printhelp() {
+  CompositeSerial.print('\n');  // newline
+  CompositeSerial.println("MIX5R Pro Help:");
+  CompositeSerial.println("h - This help menu");
+  CompositeSerial.println("v - Print current firmware version");
+  CompositeSerial.println(
+      "m - toggle assigning MIDI CC/Channel or setting output min/max");
+  CompositeSerial.println("c - Print current settings");
+  CompositeSerial.println("d - Toggle Deej serial output temporarily");
+  CompositeSerial.println("r - Reset settings to default (send twice)");
+  CompositeSerial.println("F - (Advanced) Redetect faders");
+  CompositeSerial.print('\n');  // newline
+
+  CompositeSerial.println(
+      "Settings are assigned in this format:");
+  CompositeSerial.print("   ");
+  printSettings(1);
+  CompositeSerial.print("   ");
+  printLimitSettings(1);
+
+  CompositeSerial.println(
+    "and correspond to <CC:Channel>");
+  CompositeSerial.println(
+        "or <lower_limit:upper_limit> ");
+  CompositeSerial.println("depending on the mode.");
+  CompositeSerial.println("The default limits are 0-127 and can ");
+  CompositeSerial.println("be swapped to reverse the output.");
 }
 
 // <CC,CC,CC,CC,CC:CH,CH,CH,CH,CH>
