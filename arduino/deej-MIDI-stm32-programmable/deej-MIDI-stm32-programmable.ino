@@ -167,7 +167,7 @@ void setup() {
 
   delay(500);
   // EEPROM setup:
-  const int magicNum = 204;
+  const int magicNum = 200;
   if (EEPROM.read(addressFlag) == magicNum) {
     // EEPROM already set. Reading.
     CompositeSerial.println("EEPROM already set. Reading");
