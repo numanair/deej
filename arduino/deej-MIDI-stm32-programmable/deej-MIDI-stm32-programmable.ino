@@ -389,7 +389,7 @@ void recvWithStartEndMarkers() {
       }
     }
     else if (rc != togDeej) {
-      deej = -1; // any serial input turns off deej
+      deej = -1; // any unmapped serial input turns off deej
       printhelp(); // print help/info to serial
     }
     if (rc != reset) {
