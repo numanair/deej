@@ -18,7 +18,7 @@
 const String firmwareVersion = "v1.4.0";
 
 // Number of potentiometers or faders
-const uint8_t NUM_INPUTS = 8; // ADC input available on MCU
+const uint8_t NUM_INPUTS = 8; // number of ADC inputs available on MCU
 uint8_t NUM_SLIDERS_ACTIVE = 5; // dynamic fader count
 
 // Potentiometer pins assignment
@@ -356,7 +356,6 @@ void recvWithStartEndMarkers() {
       }
       if (isFirstReset) {
         // print reset message and wait for next 'r'
-        // CompositeSerial.println("Position faders in lowest position and"); // TODO: auto NUM_SLIDERS
         CompositeSerial.println("Send 'r' again to reset to defaults.");
         isFirstReset = false;
         timeoutreset.start();
@@ -661,6 +660,7 @@ void detectFaders() {
 
 void resetSettings() {
   // reset EEPROM to defaults
+  // also sets active settings arrays
   CompositeSerial.println("First run, set EEPROM data to defaults");
   for (int i = 0; i < NUM_INPUTS; ++i) {
     midi_channel[i] = midi_channel_defaults[i];
