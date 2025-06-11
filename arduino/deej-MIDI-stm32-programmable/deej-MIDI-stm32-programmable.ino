@@ -26,10 +26,10 @@ const uint8_t analogInputs[NUM_INPUTS] = {0, 1, 2, 3, 4, 5, 6, 7};
 
 const uint8_t midi_channel_defaults[NUM_INPUTS] = {
   1, 1,  1, 1,  1,  1,  1,  1};   // 1 through 16
-const uint8_t cc_command_defaults[NUM_INPUTS]   = {
+const uint8_t midi_cc_defaults[NUM_INPUTS]   = {
   1, 11, 7, 14, 21, 22, 23, 24};  // MIDI CC number
 uint8_t midi_channel[NUM_INPUTS];
-uint8_t cc_command[NUM_INPUTS];
+uint8_t midi_cc[NUM_INPUTS];
 
 // Optionally limit range of MIDI output per fader.
 // Can be used to invert or limit.
@@ -172,7 +172,7 @@ void setup() {
   if (EEPROM.read(addressFlag) == magicNum) {
     // EEPROM already set. Reading.
     CompositeSerial.println("EEPROM already set. Reading");
-    readFromEEPROM(addressWriteCC, cc_command, NUM_INPUTS, 127);     // CC
+    readFromEEPROM(addressWriteCC, midi_cc, NUM_INPUTS, 127);     // CC
     readFromEEPROM(addressWriteChan, midi_channel, NUM_INPUTS, 16);  // Channel
     readFromEEPROM(addressWriteLowerLimit, cc_lower_limit, NUM_INPUTS,
                    127);  // Lower bound of each fader output
@@ -458,7 +458,7 @@ void parseData() {
       strtokIndx2 = strtok(NULL, ",");  // next token
     }
     integerFromPC = atoi(strtokIndx2);  // convert this part to an integer
-    cc_command[i] = integerFromPC;
+    midi_cc[i] = integerFromPC;
   }
   // End CC code
 
@@ -533,7 +533,7 @@ void printSettings(bool plain) { // bool plain = 0
     CompositeSerial.println("MIDI CC & Channel Assignment");
   }
   CompositeSerial.print("<");
-  printArray(cc_command, NUM_SLIDERS_ACTIVE);
+  printArray(midi_cc, NUM_SLIDERS_ACTIVE);
   CompositeSerial.print(":");
   printArray(midi_channel, NUM_SLIDERS_ACTIVE);
   CompositeSerial.print(">");
@@ -580,7 +580,7 @@ void filteredAnalog() {
 
         // Send MIDI
         // Channel starts at 0, but midi_channel starts at 1.
-        midi.sendControlChange(midi_channel[i] - 1, cc_command[i],
+        midi.sendControlChange(midi_channel[i] - 1, midi_cc[i],
                                new_value[i]);
       }
     }
@@ -664,7 +664,7 @@ void resetSettings() {
   CompositeSerial.println("First run, set EEPROM data to defaults");
   for (int i = 0; i < NUM_INPUTS; ++i) {
     midi_channel[i] = midi_channel_defaults[i];
-    cc_command[i] = cc_command_defaults[i];
+    midi_cc[i] = midi_cc_defaults[i];
     cc_lower_limit[i] = cc_lower_limit_default[i];
     cc_upper_limit[i] = cc_upper_limit_default[i];
   }
@@ -672,7 +672,7 @@ void resetSettings() {
 }
 
 void writeAllSettings() {
-  writeToEEPROM(addressWriteCC, cc_command, NUM_INPUTS, 127);     // CC
+  writeToEEPROM(addressWriteCC, midi_cc, NUM_INPUTS, 127);     // CC
   writeToEEPROM(addressWriteChan, midi_channel, NUM_INPUTS, 16);  // Channel
   writeToEEPROM(addressWriteLowerLimit, cc_lower_limit,
                 NUM_INPUTS, 127);  // Lower bound of each fader output
