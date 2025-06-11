@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.4.0
+
+- Feature: reset to default settings
+- The number of faders can now be detected at runtime
+
 ## v1.2.1
 
 - Increased fader threshold slightly
