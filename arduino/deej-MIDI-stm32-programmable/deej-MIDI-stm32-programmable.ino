@@ -588,7 +588,7 @@ void filteredAnalog() {
 }
 
 void updateSliderValues(bool onlyActive = 1) {
-  uint reps = NUM_INPUTS;
+  uint8_t reps = NUM_INPUTS;
   if (onlyActive) {
     reps = NUM_SLIDERS_ACTIVE;
   }
