@@ -568,7 +568,7 @@ void filteredAnalog() {
       adaptiveval = map(adaptiveval, lower_deadzone, upper_deadzone, 0, 4095);
 
       adaptiveval = adaptiveval >> 5;  // 12 to 7-bit (128)
-      constrain(adaptiveval, 0, 127);  // cap output to MIDI range
+      adaptiveval = constrain(adaptiveval, 0, 127);  // cap output to MIDI range
 
       // map to user specified range
       new_value[i] =
@@ -613,7 +613,7 @@ void sendSliderValues() {
     // Map Deej output to MIDI limits (7-bit to 10-bit conversion)
     limitedVal = map(limitedVal, idealOutputValues[0],
                      idealOutputValues[arrayQty - 1], minVal10bit, maxVal10bit);
-    constrain(limitedVal, 0, 1023);
+    limitedVal = constrain(limitedVal, 0, 1023);
     builtString += String((int)limitedVal);
     if (i < NUM_SLIDERS_ACTIVE - 1) {
       builtString += String("|");
