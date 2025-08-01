@@ -15,7 +15,7 @@
 // https://www.midi.org/specifications-old/item/table-3-control-change-messages-data-bytes-2
 // https://anotherproducer.com/online-tools-for-musicians/midi-cc-list/
 
-const String firmwareVersion = "v1.4.0";
+const String firmwareVersion = "v1.4.1";
 
 // Number of potentiometers or faders
 const uint8_t NUM_INPUTS = 8; // number of ADC inputs available on MCU
@@ -25,7 +25,7 @@ uint8_t NUM_SLIDERS_ACTIVE = 5; // dynamic fader count
 const uint8_t analogInputs[NUM_INPUTS] = {0, 1, 2, 3, 4, 5, 6, 7};
 
 const uint8_t midi_channel_defaults[NUM_INPUTS] = {
-  1, 1,  1, 1,  1,  1,  1,  1};   // 1 through 16
+  1,  1, 1,  1,  1,  1,  1,  1};   // 1 through 16
 const uint8_t midi_cc_defaults[NUM_INPUTS]   = {
   1, 11, 7, 14, 21, 22, 23, 24};  // MIDI CC number
 uint8_t midi_channel[NUM_INPUTS];
@@ -262,6 +262,7 @@ void writeToEEPROM(int addressRead, byte byteArray[], int arraySize, int max) {
     EEPROM.write(addressRead, byteArray[i]);
     ++addressRead;
   }
+  delay(500);
 }
 
 void readFromEEPROM(int addressRead, byte byteArray[], int arraySize, int max) {
@@ -376,6 +377,9 @@ void recvWithStartEndMarkers() {
       }
       if (isFirstDetect) {
         // print reset message and wait for next 'F'
+        CompositeSerial.println("");
+        CompositeSerial.print("Enabled faders:");
+        CompositeSerial.println(NUM_SLIDERS_ACTIVE);
         CompositeSerial.println("Position faders in lowest position and");
         CompositeSerial.println("send 'F' again to detect number of faders.");
         CompositeSerial.println("> Not recommended unless you know why! <");
@@ -642,6 +646,7 @@ void detectFaders() {
         // end detection
         NUM_SLIDERS_ACTIVE = potentialCount;
         EEPROM.write(addressWriteFaderCt, NUM_SLIDERS_ACTIVE);
+        delay(1000);
         break;
       }
     }
