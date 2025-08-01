@@ -15,7 +15,7 @@
 // https://www.midi.org/specifications-old/item/table-3-control-change-messages-data-bytes-2
 // https://anotherproducer.com/online-tools-for-musicians/midi-cc-list/
 
-const String firmwareVersion = "v1.4.0";
+const String firmwareVersion = "v1.4.1";
 
 // Number of potentiometers or faders
 const uint8_t NUM_INPUTS = 8; // number of ADC inputs available on MCU
@@ -262,6 +262,7 @@ void writeToEEPROM(int addressRead, byte byteArray[], int arraySize, int max) {
     EEPROM.write(addressRead, byteArray[i]);
     ++addressRead;
   }
+  delay(500);
 }
 
 void readFromEEPROM(int addressRead, byte byteArray[], int arraySize, int max) {
@@ -642,6 +643,7 @@ void detectFaders() {
         // end detection
         NUM_SLIDERS_ACTIVE = potentialCount;
         EEPROM.write(addressWriteFaderCt, NUM_SLIDERS_ACTIVE);
+        delay(1000);
         break;
       }
     }
