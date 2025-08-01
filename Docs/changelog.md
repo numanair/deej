@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.4.1
+
+- Print number of detected faders on first `F`
+
 ## v1.4.0
 
 - Feature: reset to default settings
