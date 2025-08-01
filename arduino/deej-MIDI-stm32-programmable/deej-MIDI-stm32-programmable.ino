@@ -377,6 +377,9 @@ void recvWithStartEndMarkers() {
       }
       if (isFirstDetect) {
         // print reset message and wait for next 'F'
+        CompositeSerial.println("");
+        CompositeSerial.print("Enabled faders:");
+        CompositeSerial.println(NUM_SLIDERS_ACTIVE);
         CompositeSerial.println("Position faders in lowest position and");
         CompositeSerial.println("send 'F' again to detect number of faders.");
         CompositeSerial.println("> Not recommended unless you know why! <");
