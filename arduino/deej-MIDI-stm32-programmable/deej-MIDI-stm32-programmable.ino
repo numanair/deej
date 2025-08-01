@@ -25,7 +25,7 @@ uint8_t NUM_SLIDERS_ACTIVE = 5; // dynamic fader count
 const uint8_t analogInputs[NUM_INPUTS] = {0, 1, 2, 3, 4, 5, 6, 7};
 
 const uint8_t midi_channel_defaults[NUM_INPUTS] = {
-  1, 1,  1, 1,  1,  1,  1,  1};   // 1 through 16
+  1,  1, 1,  1,  1,  1,  1,  1};   // 1 through 16
 const uint8_t midi_cc_defaults[NUM_INPUTS]   = {
   1, 11, 7, 14, 21, 22, 23, 24};  // MIDI CC number
 uint8_t midi_channel[NUM_INPUTS];
