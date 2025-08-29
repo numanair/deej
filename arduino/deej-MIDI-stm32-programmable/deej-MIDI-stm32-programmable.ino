@@ -15,7 +15,7 @@
 // https://www.midi.org/specifications-old/item/table-3-control-change-messages-data-bytes-2
 // https://anotherproducer.com/online-tools-for-musicians/midi-cc-list/
 
-const String firmwareVersion = "v1.4.1";
+const String firmwareVersion = "v1.4.2";
 
 // Number of potentiometers or faders
 const uint8_t NUM_INPUTS = 8; // number of ADC inputs available on MCU
@@ -188,6 +188,8 @@ void setup() {
   } else {
     // First run, set EEPROM data to defaults and
     // populate midi_channel, etc with default values
+    EEPROM.init();
+    EEPROM.format();
     resetSettings();
     // write settings not set by the reset
     EEPROM.write(addressWriteFaderCt, NUM_SLIDERS_ACTIVE); // number of faders active/enabled

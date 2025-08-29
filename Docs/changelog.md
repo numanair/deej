@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.4.2
+
+- Format EEPROM on initialization (fix for very rare settings saving issue)
+
 ## v1.4.1
 
 - Print number of detected faders on first `F`
