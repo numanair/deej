@@ -192,8 +192,8 @@ void setup() {
     EEPROM.format();
     resetSettings();
     // write settings not set by the reset
-    EEPROM.write(addressWriteFaderCt, NUM_SLIDERS_ACTIVE); // number of faders active/enabled
-    EEPROM.write(addressFlag, magicNum);  // mark EEPROM as set
+    EEPROM.update(addressWriteFaderCt, NUM_SLIDERS_ACTIVE); // number of faders active/enabled
+    EEPROM.update(addressFlag, magicNum);  // mark EEPROM as set
   }
 
   delay(500);
@@ -261,7 +261,7 @@ void writeToEEPROM(int addressRead, byte byteArray[], int arraySize, int max) {
       // Keeps CC/channel within limit
       byteArray[i] = max;
     }
-    EEPROM.write(addressRead, byteArray[i]);
+    EEPROM.update(addressRead, byteArray[i]);
     ++addressRead;
   }
   delay(500);
@@ -647,7 +647,7 @@ void detectFaders() {
       else {
         // end detection
         NUM_SLIDERS_ACTIVE = potentialCount;
-        EEPROM.write(addressWriteFaderCt, NUM_SLIDERS_ACTIVE);
+        EEPROM.update(addressWriteFaderCt, NUM_SLIDERS_ACTIVE);
         delay(1000);
         break;
       }
